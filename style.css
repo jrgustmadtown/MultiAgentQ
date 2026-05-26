@@ -8,6 +8,7 @@
 
   --p1: #a93226;
   --p2: #2471a3;
+  --dog: #2e7d32;
   --link: #2c5282;
 
   --font-serif: "Georgia", "Times New Roman", Times, serif;
@@ -64,6 +65,7 @@ body {
   color: var(--muted);
   font-size: 1rem;
   font-style: italic;
+  text-align: center;
 }
 
 /* --- Simple scroll nav --- */
@@ -147,14 +149,26 @@ strong {
   font-weight: 600;
 }
 
-/* --- Agent labels (figures only) --- */
+/* --- Player 1 (red) / Player 2 (blue) --- */
 
-.agent-p1 {
+.agent-p1,
+.sub-p1 {
   color: var(--p1);
 }
 
-.agent-p2 {
+.agent-p2,
+.sub-p2 {
   color: var(--p2);
+}
+
+.agent-p1,
+.agent-p2 {
+  font-weight: 600;
+}
+
+#dog-competitive .agent-dog {
+  color: var(--dog);
+  font-weight: 600;
 }
 
 /* --- Figures (compact, accompanying) --- */
@@ -205,8 +219,19 @@ figcaption strong {
   min-width: 0;
 }
 
-.with-figure > figure {
+.with-figure > figure,
+.with-figure > .figure-stack {
   flex: 0 0 var(--figure-width);
+}
+
+.figure-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.figure-stack figure {
+  max-width: 100%;
 }
 
 /* --- Code --- */
@@ -278,6 +303,24 @@ th {
 
 .game-block p:last-child {
   margin-bottom: 0;
+}
+
+/* Displayed equations */
+
+.formula {
+  margin: 0.85rem 0;
+  padding: 0.6rem 0.85rem;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  text-align: center;
+  hyphens: none;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--rule);
+}
+
+.formula sub {
+  font-size: 0.75em;
 }
 
 /* --- Footer --- */
