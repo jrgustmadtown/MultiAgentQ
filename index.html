@@ -1,2 +1,358 @@
-<h1> hi </h1>
-<p> this is a test </p>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Multiple Agents &amp; Q-Networks</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="site-header">
+        <h1 class="site-title">Multiple Agents &amp; Q-Networks</h1>
+        <p class="site-subtitle">Neural planning in two-player games</p>
+      </header>
+
+      <ul class="page-nav">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#approach">Approach</a></li>
+        <li><a href="#methods">Methods</a></li>
+        <li><a href="#games">Games</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#usage">Usage</a></li>
+      </ul>
+
+      <section id="overview">
+        <h2>Overview</h2>
+        <p class="lede">
+          This project studies how two agents should act when their rewards depend on each
+          other’s choices. None of the games learn from environment rollouts—the transition
+          and reward rules are fully known, and each module performs
+          <strong>neural planning</strong>: sample states, compute Bellman targets from the
+          model, and fit deep networks to approximate Q-values over joint actions. Policies
+          are then extracted using minimax, Nash equilibrium, or cooperative joint
+          optimization, depending on the game type.
+        </p>
+        <p>
+          Four environments are implemented—two grid-based car games and two continuous
+          “dog” games—sharing a common modular codebase built with PyTorch. The same
+          high-level pipeline appears in each module: define the environment, plan (fit
+          Q-networks via fitted value iteration), extract a policy, visualize rollouts, and
+          export network weights.
+        </p>
+      </section>
+
+      <section id="approach">
+        <h2>Approach</h2>
+        <p>
+          Classical tabular value iteration is intractable when the state space is large or
+          continuous. Each module instead performs <strong>approximate dynamic programming
+          with function approximation</strong>. At every planning iteration a random state is
+          sampled, all joint actions are evaluated using the environment model, and Bellman
+          targets are computed from a target network. Those targets are stored in a replay
+          buffer and the network weights are updated with supervised regression (Smooth L1
+          loss, Adam optimizer, gradient clipping)—fitting a function, not learning from
+          trial-and-error interaction.
+        </p>
+        <p>
+          Because the model is known, no exploratory rollouts are required—the agents never
+          “play” the game to gather experience. The planner repeatedly asks: given this state,
+          what Q-values are consistent with the Bellman equation and the chosen game-theoretic
+          solution concept? The answer is stored in a neural network that generalizes across
+          states.
+        </p>
+        <p>
+          After planning completes, policies are derived from the fitted Q-functions. In the
+          zero-sum car game a single network suffices; in general-sum settings each player has
+          its own network; in the cooperative dog game both networks are planned toward a
+          shared team objective.
+        </p>
+      </section>
+
+      <section id="methods">
+        <h2>Methods</h2>
+        <p>
+          The environments differ in payoff structure. The planning loop adapts the bootstrap
+          operator used to compute next-state values and the rule used to extract actions at
+          policy time.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Game</th>
+              <th>Payoff type</th>
+              <th>Networks</th>
+              <th>Bootstrap</th>
+              <th>Policy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Car (zero-sum)</td>
+              <td>Single reward; P2 minimizes</td>
+              <td>1</td>
+              <td>max<sub>a1</sub> min<sub>a2</sub> Q</td>
+              <td>Minimax best response</td>
+            </tr>
+            <tr>
+              <td>Car (general-sum)</td>
+              <td>Separate rewards per player</td>
+              <td>2</td>
+              <td>Nash value (iterated best response)</td>
+              <td>Nash equilibrium (<code>nashpy</code>)</td>
+            </tr>
+            <tr>
+              <td>Dog (competitive)</td>
+              <td>Each wants dog near own house</td>
+              <td>2</td>
+              <td>Nash value (iterated best response)</td>
+              <td>Iterated best response</td>
+            </tr>
+            <tr>
+              <td>Dog (cooperative)</td>
+              <td>Shared reward toward one house</td>
+              <td>2</td>
+              <td>max joint (Q<sub>1</sub> + Q<sub>2</sub>)</td>
+              <td>Argmax of Q<sub>1</sub> + Q<sub>2</sub></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          Nash equilibria in small action spaces are computed exactly at policy extraction
+          time via support enumeration, with a uniform-strategy fallback when no equilibrium
+          is found. During planning a faster iterated best-response approximation keeps
+          computation tractable.
+        </p>
+      </section>
+
+      <section id="games">
+        <h2>Games</h2>
+        <p>
+          All four games involve two players choosing actions simultaneously each step.
+          <span class="agent-p1">Player 1</span> is shown in red and
+          <span class="agent-p2">Player 2</span> in blue in the rollout diagrams below.
+        </p>
+
+        <div class="game-block" id="car-zero">
+          <h3>Zero-Sum Car Game</h3>
+          <p class="game-meta">Minimax DQN · discrete 5×5 grid · <code>cargame_zerosum/</code></p>
+
+          <div class="with-figure">
+            <div>
+              <p>
+                Two cars move on a grid with four actions each (up, down, left, right).
+                Player 1 maximizes a single scalar reward; Player 2 is treated as a minimizer.
+                Reward is highest near the grid center (Manhattan distance from the middle),
+                with penalties for crashing into the same cell, staying in place, and a small
+                living cost each step. A collision ends the episode.
+              </p>
+              <p>
+                One Q-network outputs all 16 joint action values. Planning targets use a
+                minimax backup: the value of the next state is the maximum over Player 1
+                actions of the minimum over Player 2 actions. The extracted policy picks
+                Player 1’s maximin action and Player 2’s best response to it.
+              </p>
+            </div>
+
+            <figure>
+              <div class="figure-frame">
+                <img
+                  src="cargame_zerosum/rollout_1.png"
+                  alt="Zero-sum car game rollout on a 5 by 5 grid"
+                >
+              </div>
+              <figcaption>
+                <strong>Figure 1.</strong> Minimax DQN rollout in the zero-sum car game.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="game-block" id="car-gensum">
+          <h3>General-Sum Car Game</h3>
+          <p class="game-meta">Nash-Q · same grid mechanics · <code>cargame_gensum/</code></p>
+
+          <div class="with-figure">
+            <div>
+              <p>
+                The grid dynamics are identical to the zero-sum variant, but each player
+                receives a separate reward based on their own car’s position after the move.
+                Both players prefer the center and wish to avoid crashes, yet their incentives
+                are not strictly opposed—a general-sum game requiring Nash equilibrium
+                reasoning rather than minimax.
+              </p>
+              <p>
+                Two Q-networks are planned in parallel. Bootstrapping at each next state uses
+                approximate Nash values from the target networks. At deployment, a Nash
+                equilibrium of the 4×4 Q-matrices is solved to select actions.
+              </p>
+            </div>
+
+            <figure>
+              <div class="figure-frame">
+                <img
+                  src="cargame_gensum/rollout_5.png"
+                  alt="General-sum car game rollout from state 1, 1, 3, 4"
+                >
+              </div>
+              <figcaption>
+                <strong>Figure 2.</strong> Nash-Q rollout from state (1, 1, 3, 4).
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="game-block" id="dog">
+          <h3>Dog Game (Competitive)</h3>
+          <p class="game-meta">Nash-Q · continuous unit square · <code>doggame/</code></p>
+
+          <div class="with-figure">
+            <div>
+              <p>
+                Two players move in a continuous [0, 1]² field. Each step they choose among
+                17 actions: stay or move in one of 16 directions spaced every 22.5°. A virtual
+                dog sits at the midpoint of the two players. Player 1’s house is at (0.25, 0.25)
+                and Player 2’s at (0.75, 0.75) by default. Each player’s reward is the negative
+                Euclidean distance from the dog to their own house—a tug-of-war over the dog’s
+                position.
+              </p>
+              <p>
+                Because the state space is continuous, networks must generalize beyond a
+                tabular representation. States are sampled with boundary bias during planning.
+                The Nash-Q procedure mirrors the general-sum car game; policy vector fields
+                visualize each player’s preferred direction across the field.
+              </p>
+            </div>
+
+            <figure>
+              <div class="figure-frame">
+                <img
+                  src="doggame/rollout_1.png"
+                  alt="Competitive dog game rollout showing players and dog midpoint"
+                >
+              </div>
+              <figcaption>
+                <strong>Figure 3.</strong> Competitive dog game rollout.
+                Green dashed arrows trace the dog midpoint.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="with-figure">
+            <p>
+              The vector-field plot shows each player’s policy direction when the opponent
+              is held at a fixed corner, revealing how agents steer the shared dog toward
+              their respective houses.
+            </p>
+
+            <figure>
+              <div class="figure-frame">
+                <img
+                  src="doggame/vector_fields.png"
+                  alt="Policy vector fields for Player 1 and Player 2 in the dog game"
+                >
+              </div>
+              <figcaption>
+                <strong>Figure 4.</strong> Policy vector fields for both players.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="game-block" id="dog-coop">
+          <h3>Dog Game (Cooperative)</h3>
+          <p class="game-meta">Joint Q-planning · wall obstacle · <code>doggame_coop/</code></p>
+
+          <div class="with-figure">
+            <div>
+              <p>
+                The cooperative variant keeps the midpoint dog mechanic but gives both players
+                the same goal: move the dog to a single house (default upper-right). A wall
+                segment blocks direct paths; player movement and the dog midpoint respect
+                collision geometry, with blocked motion sliding tangentially along the wall.
+              </p>
+              <p>
+                Both players receive identical reward: negative distance to the house, plus a
+                bonus when the dog enters a success radius. Planning selects the joint action
+                maximizing the sum of both players’ Q-values at the next state rather than a
+                Nash equilibrium. Rollouts terminate early on success.
+              </p>
+            </div>
+
+            <figure>
+              <div class="figure-frame">
+                <img
+                  src="doggame_coop/rollout_1.png"
+                  alt="Cooperative dog game rollout navigating toward a house"
+                >
+              </div>
+              <figcaption>
+                <strong>Figure 5.</strong> Cooperative rollout toward the shared house target.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>Architecture</h2>
+        <p>
+          Each game is a self-contained Python package with the same module layout. Shared
+          utilities live at the repository root so replay buffers, Nash helpers, and output
+          paths are not duplicated.
+        </p>
+        <ul>
+          <li><strong>Entry script</strong> — CLI arguments and orchestration</li>
+          <li><strong><code>environment.py</code></strong> — transitions, rewards, and state sampling</li>
+          <li><strong><code>dqn.py</code></strong> — network architecture, state encoding, replay buffer import</li>
+          <li><strong><code>trainer.py</code></strong> — neural planning loop and target computation</li>
+          <li><strong><code>policy.py</code></strong> — policy extraction and rollout simulation</li>
+          <li><strong><code>visualization.py</code></strong> — loss curves and trajectory plots</li>
+          <li><strong><code>io_utils.py</code></strong> — weight export and output paths</li>
+          <li><strong><code>utilities/</code></strong> — shared replay buffer, Nash solvers, runtime helpers</li>
+        </ul>
+        <p>
+          Grid games use a compact network (4 → 64 → 64 → 16 joint actions). Continuous dog
+          games use a larger network (4 → 256 → 256 → 289 joint actions for 17×17 action
+          pairs). Each run performs 8,000 planning iterations by default and produces rollout
+          images, loss plots, and exported weight matrices in each game’s directory.
+        </p>
+      </section>
+
+      <section id="usage">
+        <h2>Usage</h2>
+        <p>
+          Install dependencies from the repository root (<code>torch</code>,
+          <code>numpy</code>, <code>matplotlib</code>; game modules also require
+          <code>nashpy</code> where Nash equilibria are computed). Run each game from its
+          directory or pass the script path from the repo root:
+        </p>
+
+        <pre><code># Zero-sum car game (minimax)
+python cargame_zerosum/cargame_z.py --iterations 8000 --grid-size 5
+
+# General-sum car game (Nash-Q)
+python cargame_gensum/cargame_g.py --iterations 8000 --grid-size 5
+
+# Competitive dog game (Nash-Q)
+python doggame/doggame.py --iterations 8000 --horizon 10
+
+# Cooperative dog game (joint Q)
+python doggame_coop/doggame_coop.py --iterations 8000 --horizon 20</code></pre>
+
+        <p>
+          The dog games accept additional flags for step size, house positions, wall geometry,
+          and success radius. Each run saves <code>planning_loss.png</code>,
+          <code>rollout_*.png</code>, and <code>weights_player*.txt</code> alongside the
+          game module. The competitive dog game also writes <code>vector_fields.png</code>.
+        </p>
+      </section>
+
+      <footer class="site-footer">
+        <p>Multiple Agents &amp; Q-Networks — PyTorch · neural planning in two-player games</p>
+      </footer>
+    </main>
+  </body>
+</html>
