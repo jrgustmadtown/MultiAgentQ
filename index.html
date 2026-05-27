@@ -53,7 +53,7 @@
           16 possible joint actions per state.
         </p>
         <p>
-          Rewards encourage moving toward the grid center; Visiting a square gives reward based on Manhattan
+          Rewards encourage moving toward the grid center. Visiting a square gives reward based on Manhattan
           distance to the center. Both cars receive penalties for colliding on the same cell (terminal)
           and a small per-step living cost. 
         </p>
@@ -147,7 +147,7 @@
             <div>
               <p>
                 Each player receives a separate reward based on their own car’s position after
-                the move—the same center bonus, stay penalty, and living cost applied to each
+                the move. The same center bonus, stay penalty, and living cost are applied to each
                 car independently. On a crash, <em>both</em> players receive the same large
                 penalty in their own reward, so <span class="agent-p1">Player 1</span> and
                 <span class="agent-p2">Player 2</span> are both incentivized to avoid
@@ -225,13 +225,13 @@
           The dog game is a continuous game played on the unit square [0, 1]². Each player
           controls a position in the plane. The state is all four coordinates. Each step both
           players choose among 17 actions: stay, or move in one of 16 directions spaced every
-          22.5° for a distance of 0.1. A dog sits at the midpoint of the two players. The dogs position
+          22.5° for a distance of 0.1. A <span class="agent-dog">dog</span> sits at the midpoint of the two players. The <span class="agent-dog">dog</span>'s position
           is updated as the players move. 
         </p>
         <p>
           Because the state space is continuous, Q-values cannot be stored in a table; neural
           networks generalize across states sampled during planning (with mild boundary bias).
-          Two variants share the dog at the midpoint of the players mechanic but differ in objectives and obstacles.
+          Two variants share the <span class="agent-dog">dog</span> at the midpoint of the players mechanic but differ in objectives and obstacles.
         </p>
 
         <div class="game-block" id="dog-competitive">
@@ -329,10 +329,10 @@
           <div class="with-figure">
             <div>
               <p>
-                Both player's goal is to move the dog to a single house. A wall segment blocks direct paths; player
-                movement and the dog midpoint respect collision geometry, with blocked motion
+                Both player's goal is to move the <span class="agent-dog">dog</span> to a single house. A wall segment blocks direct paths; player
+                movement and the <span class="agent-dog">dog</span> midpoint respect collision geometry, with blocked motion
                 sliding tangentially along the wall. Both receive identical reward: the negative
-                distance to the house, plus a bonus when the dog enters a success radius.
+                distance to the house, plus a bonus when the <span class="agent-dog">dog</span> enters a success radius.
               </p>
               <p>
                 States are four coordinates in [0, 1]². Two networks share architecture
@@ -364,7 +364,7 @@
               <p>
                 At policy time, the joint action maximizing
                 <span class="agent-p1">Q₁</span> + <span class="agent-p2">Q₂</span> is chosen.
-                Rollouts terminate early when the dog reaches the success radius around the house.
+                Rollouts terminate early when the <span class="agent-dog">dog</span> reaches the success radius around the house.
               </p>
             </div>
 
@@ -377,8 +377,8 @@
                   >
                 </div>
                 <figcaption>
-                  Dog is stuck at the closest position to the house behind the wall
-                  <br> Players were unable to learn a policy that allows the dog to navigate around the wall
+                  <span class="agent-dog">Dog</span> is stuck at the closest position to the house behind the wall
+                  <br> Players were unable to learn a policy that allows the <span class="agent-dog">dog</span> to navigate around the wall
                 </figcaption>
               </figure>
               <figure>
@@ -389,7 +389,7 @@
                   >
                 </div>
                 <figcaption>
-                  Dog reaches the house
+                  <span class="agent-dog">Dog</span> reaches the house
                   <br> Players start in positions such that the wall poses minimal obstruction
                 </figcaption>
               </figure>
