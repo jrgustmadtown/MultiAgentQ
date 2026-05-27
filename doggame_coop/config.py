@@ -18,12 +18,10 @@ DEFAULT_HORIZON = 20
 DEFAULT_ITERATIONS = 8000
 
 # Single cooperative house target
-DEFAULT_HOUSE = (0.75, 0.75)
+DEFAULT_HOUSE = (0.75, 0.25)
 SUCCESS_RADIUS = 0.05
 SUCCESS_BONUS = 3.0
-
-# Single wall segment from bottom edge up toward the goal area.
-DEFAULT_WALL = ((0.5, 0.0), (0.5, 0.75))
+DEFAULT_WALL = ((0.6, 0.2), (0.8, 0.4))
 
 # 17 actions, stay + 16 directions (22.5 degree spacing)
 _angles_deg = [
