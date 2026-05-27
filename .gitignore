@@ -1,7 +1,5 @@
-**/rollout*.png
 **/planning_loss.png
 **/weights_player*.txt
-**/vector_fields.png
 __pycache__/
 __pycache__/*
 .venv/
