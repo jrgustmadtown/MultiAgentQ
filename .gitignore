@@ -1,5 +1,6 @@
 **/planning_loss.png
 **/weights_player*.txt
+**/weights_player*.json
 __pycache__/
 __pycache__/*
 .venv/
