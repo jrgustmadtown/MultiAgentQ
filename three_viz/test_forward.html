@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Q-Network Forward Pass Test</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
+      pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
+      .ok { color: #0a7; }
+      .err { color: #c33; }
+    </style>
+  </head>
+  <body>
+    <h1>Q-Network Forward Pass Test</h1>
+    <p>
+      Serve the repo root so <code>fetch</code> can load JSON, e.g.
+      <code>python3 -m http.server 8000</code> then open
+      <code>http://localhost:8000/three_viz/test_forward.html</code>.
+    </p>
+    <div id="out">Loading…</div>
+    <script type="module">
+      import { loadWeights, qValues } from "./qnetwork.js";
+
+      const tests = [
+        {
+          name: "cargame_zerosum player 1",
+          url: "../cargame_zerosum/weights_player1.json",
+          state: [0, 0, 4, 4],
+          gridSize: 5,
+        },
+        {
+          name: "doggame player 1",
+          url: "../doggame/weights_player1.json",
+          state: [0.25, 0.25, 0.75, 0.75],
+        },
+      ];
+
+      const out = document.getElementById("out");
+
+      try {
+        const results = [];
+        for (const test of tests) {
+          const model = await loadWeights(test.url);
+          const q = qValues(model, test.state, { gridSize: test.gridSize });
+          const max = Math.max(...q);
+          const argmax = q.indexOf(max);
+          results.push(
+            `${test.name}\n` +
+              `  format: ${model.format}\n` +
+              `  state: [${test.state.join(", ")}]\n` +
+              `  outputs: ${q.length}\n` +
+              `  max Q: ${max.toFixed(6)} at index ${argmax}\n` +
+              `  first 5 Q: [${q.slice(0, 5).map((v) => v.toFixed(4)).join(", ")}]`
+          );
+        }
+        out.innerHTML = `<pre class="ok">${results.join("\n\n")}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<pre class="err">${err.message}</pre>`;
+      }
+    </script>
+  </body>
+</html>

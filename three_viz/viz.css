@@ -1,0 +1,140 @@
+/* Interactive viz pages — extends style.css */
+
+.page--viz {
+  max-width: 72rem;
+}
+
+.viz-section {
+  margin: 1.75rem 0 2.5rem;
+}
+
+.viz-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: 1.25rem 2rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+figure.viz-figure {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.viz-figure {
+  width: 100%;
+  min-width: 0;
+}
+
+.viz-figure .figure-frame {
+  padding: 0;
+  overflow: hidden;
+  max-width: none;
+  width: 100%;
+}
+
+#canvas-wrap {
+  width: 100%;
+  height: clamp(32rem, min(85vh, 80vw), 52rem);
+  min-height: 32rem;
+  position: relative;
+  background: var(--surface);
+}
+
+#canvas-wrap canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.viz-controls {
+  min-width: 0;
+}
+
+.viz-btn {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  text-align: center;
+}
+
+.viz-btn:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.viz-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.viz-btn-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.viz-btn-row .viz-btn {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.viz-stats {
+  margin-top: 1rem;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text);
+  text-align: left;
+  hyphens: none;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--rule);
+}
+
+.viz-stats strong {
+  font-weight: 600;
+}
+
+.viz-stats .stats-rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 0.55rem 0;
+}
+
+.viz-stats .stats-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.viz-stats .muted {
+  color: var(--muted);
+}
+
+.viz-error {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--p1);
+}
+
+@media (max-width: 900px) {
+  .viz-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #canvas-wrap {
+    height: clamp(24rem, 70vh, 40rem);
+    min-height: 24rem;
+  }
+}
