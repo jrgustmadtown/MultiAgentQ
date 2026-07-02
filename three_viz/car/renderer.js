@@ -1,8 +1,12 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const P1_COLOR = 0xe74c3c;
-const P2_COLOR = 0x3498db;
+// Match style.css agent colors and paper palette.
+const P1_COLOR = 0xa93226;
+const P2_COLOR = 0x2471a3;
+const BG_COLOR = 0xffffff;
+const GRID_LINE = 0xcccccc;
+const GRID_BORDER = 0x999999;
 const OFFSET = 0.12;
 
 function cellCenter(x, y) {
@@ -18,10 +22,10 @@ export class CarReplayRenderer {
     this.playToken = 0;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf7f7f7);
+    this.scene.background = new THREE.Color(BG_COLOR);
 
-    const w = Math.max(container.clientWidth, 400);
-    const h = Math.max(container.clientHeight, 400);
+    const w = Math.max(container.clientWidth, 1);
+    const h = Math.max(container.clientHeight, 1);
     const aspect = w / h;
     const frustum = gridSize * 0.75;
     this.camera = new THREE.OrthographicCamera(
@@ -42,33 +46,39 @@ export class CarReplayRenderer {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
+    this.controls.enableRotate = false;
+    this.controls.enableZoom = true;
+    this.controls.minZoom = 0.8;
+    this.controls.maxZoom = 1.4;
     this.controls.target.set(gridSize / 2, 0, gridSize / 2);
     this.controls.update();
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.55);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.35);
     sun.position.set(gridSize, gridSize * 2, gridSize);
     this.scene.add(sun);
 
     this._buildGrid();
     this.scene.add(this.trailGroup);
 
-    const carGeo = new THREE.BoxGeometry(0.42, 0.18, 0.42);
-    this.car1 = new THREE.Mesh(carGeo, new THREE.MeshStandardMaterial({ color: P1_COLOR }));
-    this.car2 = new THREE.Mesh(carGeo, new THREE.MeshStandardMaterial({ color: P2_COLOR }));
+    const carGeo = new THREE.BoxGeometry(0.4, 0.12, 0.4);
+    this.car1 = new THREE.Mesh(carGeo, new THREE.MeshLambertMaterial({ color: P1_COLOR }));
+    this.car2 = new THREE.Mesh(carGeo, new THREE.MeshLambertMaterial({ color: P2_COLOR }));
     this.scene.add(this.car1);
     this.scene.add(this.car2);
 
     this._onResize = () => this.resize();
     window.addEventListener("resize", this._onResize);
+    this._resizeObserver = new ResizeObserver(() => this.resize());
+    this._resizeObserver.observe(container);
     requestAnimationFrame(() => this.resize());
     this._startRenderLoop();
   }
 
   _buildGrid() {
     const group = new THREE.Group();
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xbbbbbb });
-    const borderMat = new THREE.LineBasicMaterial({ color: 0x666666 });
+    const lineMat = new THREE.LineBasicMaterial({ color: GRID_LINE });
+    const borderMat = new THREE.LineBasicMaterial({ color: GRID_BORDER });
 
     for (let i = 0; i <= this.gridSize; i++) {
       const a = new THREE.Vector3(i, 0.01, 0);
@@ -82,7 +92,7 @@ export class CarReplayRenderer {
 
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(this.gridSize, this.gridSize),
-      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+      new THREE.MeshLambertMaterial({ color: BG_COLOR }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(this.gridSize / 2, 0, this.gridSize / 2);
@@ -127,7 +137,7 @@ export class CarReplayRenderer {
     for (let i = 0; i < total; i++) {
       const s = traj[i];
       const sn = traj[i + 1];
-      const alpha = 0.2 + 0.6 * (i / total);
+      const alpha = 0.15 + 0.45 * (i / total);
       this._addArrow(
         cellCenter(s[0], s[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
         cellCenter(sn[0], sn[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
@@ -154,8 +164,8 @@ export class CarReplayRenderer {
       from,
       len,
       color,
-      0.18,
-      0.1,
+      0.14,
+      0.08,
     );
     arrow.line.material.opacity = opacity;
     arrow.line.material.transparent = true;
@@ -222,7 +232,7 @@ export class CarReplayRenderer {
 
   resize() {
     const w = Math.max(this.container.clientWidth, 1);
-    const h = Math.max(this.container.clientHeight, 400);
+    const h = Math.max(this.container.clientHeight, 1);
     const aspect = w / h;
     const frustum = this.gridSize * 0.75;
     this.camera.left = -frustum * aspect;
@@ -249,6 +259,7 @@ export class CarReplayRenderer {
       this.renderLoopId = null;
     }
     window.removeEventListener("resize", this._onResize);
+    this._resizeObserver?.disconnect();
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }

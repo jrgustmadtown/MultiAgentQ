@@ -3,74 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Zero-Sum Car Game Replay</title>
-    <style>
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: system-ui, sans-serif;
-        background: #1a1a1a;
-        color: #eee;
-      }
-      header {
-        padding: 0.75rem 1rem;
-        background: #242424;
-        border-bottom: 1px solid #333;
-      }
-      h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-      .sub { margin: 0.25rem 0 0; font-size: 0.85rem; color: #aaa; }
-      .p1 { color: #e74c3c; }
-      .p2 { color: #3498db; }
-      main { display: flex; flex-wrap: wrap; gap: 0; }
-      #canvas-wrap {
-        flex: 1 1 520px;
-        min-width: 320px;
-        min-height: 480px;
-        height: min(72vh, 720px);
-        position: relative;
-      }
-      #canvas-wrap canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      aside {
-        flex: 0 0 280px;
-        padding: 1rem;
-        background: #242424;
-        border-left: 1px solid #333;
-      }
-      button {
-        display: block;
-        width: 100%;
-        margin-bottom: 0.5rem;
-        padding: 0.55rem 0.75rem;
-        border: 1px solid #444;
-        border-radius: 6px;
-        background: #333;
-        color: #eee;
-        cursor: pointer;
-        font-size: 0.9rem;
-      }
-      button:hover { background: #3d3d3d; }
-      button:disabled { opacity: 0.45; cursor: not-allowed; }
-      .btn-row {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-      }
-      .btn-row button {
-        flex: 1;
-        margin-bottom: 0;
-      }
-      #stats {
-        margin-top: 1rem;
-        font-size: 0.85rem;
-        line-height: 1.6;
-        color: #bbb;
-      }
-      #error { color: #f66; margin-top: 0.75rem; font-size: 0.85rem; }
-    </style>
+    <title>Zero-Sum Car Game — Replay</title>
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../viz.css">
     <script type="importmap">
     {
       "imports": {
@@ -81,27 +16,60 @@
     </script>
   </head>
   <body>
-    <header>
-      <h1>Zero-Sum Car Game</h1>
-      <p class="sub">
-        <span class="p1">Player 1</span> maximizes ·
-        <span class="p2">Player 2</span> minimizes · minimax DQN rollout
-      </p>
-    </header>
-    <main>
-      <div id="canvas-wrap"></div>
-      <aside>
-        <button id="btn-play" type="button">Play rollout</button>
-        <div class="btn-row">
-          <button id="btn-back" type="button">← Back</button>
-          <button id="btn-forward" type="button">Forward →</button>
+    <main class="page page--viz">
+      <header class="site-header">
+        <h1 class="site-title">Multiple Agents &amp; Q-Networks</h1>
+        <p class="site-subtitle">Jacob Gust — CS298 Directed Study</p>
+      </header>
+
+      <ul class="page-nav">
+        <li><a href="../../index.html">Overview</a></li>
+        <li><a href="../../index.html#car-zero">Car Game</a></li>
+        <li><a href="../../index.html#doggame">Dog Game</a></li>
+      </ul>
+
+      <section class="viz-section game-block" id="car-zero-replay">
+        <h2>Car Game</h2>
+
+        <h3>Zero-Sum Car Game</h3>
+        <p class="game-meta">Minimax DQN · interactive rollout</p>
+        <p>
+          <span class="agent-p1">Player 1</span> maximizes a single scalar reward;
+          <span class="agent-p2">Player 2</span> minimizes the same quantity.
+          Step through or play a rollout from trained weights.
+        </p>
+
+        <div class="viz-layout">
+          <figure class="viz-figure">
+            <div class="figure-frame">
+              <div id="canvas-wrap"></div>
+            </div>
+            <figcaption>
+              <span class="agent-p1">Red</span> = Player 1 ·
+              <span class="agent-p2">Blue</span> = Player 2 ·
+              arrows show the planned trajectory
+            </figcaption>
+          </figure>
+
+          <div class="viz-controls">
+            <button id="btn-play" class="viz-btn" type="button">Play rollout</button>
+            <div class="viz-btn-row">
+              <button id="btn-back" class="viz-btn" type="button">← Back</button>
+              <button id="btn-forward" class="viz-btn" type="button">Forward →</button>
+            </div>
+            <button id="btn-random" class="viz-btn" type="button">New random start</button>
+            <button id="btn-corners" class="viz-btn" type="button">Corners (0,0) vs (4,4)</button>
+            <div id="stats" class="viz-stats">Loading weights…</div>
+            <div id="error" class="viz-error"></div>
+          </div>
         </div>
-        <button id="btn-random" type="button">New random start</button>
-        <button id="btn-corners" type="button">Corners (0,0) vs (4,4)</button>
-        <div id="stats">Loading weights…</div>
-        <div id="error"></div>
-      </aside>
+      </section>
+
+      <footer class="site-footer">
+        <p>Multiple Agents &amp; Q-Networks — Jacob Gust — CS298 Directed Study</p>
+      </footer>
     </main>
+
     <script type="module">
       import { loadWeights } from "../qnetwork.js";
       import { createCarEnv } from "./environment.js";
@@ -242,21 +210,26 @@
         const cumulative = stepInfo ? stepInfo.cumulativeReward : 0;
 
         statsEl.innerHTML = `
-          <div><strong>Start:</strong> P1 (${s[0]},${s[1]}) · P2 (${s[2]},${s[3]})</div>
+          <div><strong>Start:</strong>
+            <span class="agent-p1">P1</span> (${s[0]},${s[1]}) ·
+            <span class="agent-p2">P2</span> (${s[2]},${s[3]})
+          </div>
           <div><strong>Step:</strong> ${step} / ${info.moves}</div>
-          <hr style="border:0;border-top:1px solid #444;margin:0.6rem 0">
+          <hr class="stats-rule">
           <div><strong>Scores (training rewards)</strong></div>
-          <div><span class="p1">P1 cell value:</span> ${fmt(scores.p1Grid)} <span style="color:#888">(dist ${scores.p1Dist})</span></div>
-          <div><span class="p2">P2 cell value:</span> ${fmt(scores.p2Grid)} <span style="color:#888">(dist ${scores.p2Dist})</span></div>
+          <div><span class="agent-p1">P1 cell value:</span> ${fmt(scores.p1Grid)}
+            <span class="muted">(dist ${scores.p1Dist})</span></div>
+          <div><span class="agent-p2">P2 cell value:</span> ${fmt(scores.p2Grid)}
+            <span class="muted">(dist ${scores.p2Dist})</span></div>
           <div><strong>Step reward:</strong> ${lastReward === null ? "—" : fmt(lastReward)}</div>
-          <div><strong>Cumulative (P1&nbsp;↑ / P2&nbsp;↓):</strong> ${fmt(cumulative)}</div>
-          <hr style="border:0;border-top:1px solid #444;margin:0.6rem 0">
+          <div><strong>Cumulative (P1 ↑ / P2 ↓):</strong> ${fmt(cumulative)}</div>
+          <hr class="stats-rule">
           <div><strong>Total moves:</strong> ${info.moves}</div>
-          <div><span class="p1">P1 moves:</span> ${info.p1Moves}</div>
-          <div><span class="p2">P2 moves:</span> ${info.p2Moves}</div>
+          <div><span class="agent-p1">P1 moves:</span> ${info.p1Moves}</div>
+          <div><span class="agent-p2">P2 moves:</span> ${info.p2Moves}</div>
           <div><strong>Unique states:</strong> ${info.unique}</div>
           <div><strong>Ended in crash:</strong> ${info.crashed ? "yes" : "no"}</div>
-          <p style="color:#888;font-size:0.78rem;margin:0.5rem 0 0">
+          <p class="stats-note">
             Cell value = grid reward from Manhattan distance to center.
             Zero-sum step reward also includes living cost and stay penalties.
           </p>
