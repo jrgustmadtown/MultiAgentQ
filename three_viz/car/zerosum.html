@@ -18,24 +18,20 @@
   <body>
     <main class="page page--viz">
       <header class="site-header">
-        <h1 class="site-title">Multiple Agents &amp; Q-Networks</h1>
+        <h1 class="site-title">Car Game</h1>
         <p class="site-subtitle">Jacob Gust — CS298 Directed Study</p>
       </header>
 
       <ul class="page-nav">
-        <li><a href="../../index.html">Overview</a></li>
-        <li><a href="../../index.html#car-zero">Car Game</a></li>
-        <li><a href="../../index.html#doggame">Dog Game</a></li>
+        <li><a href="../../index.html">← Back to main page</a></li>
       </ul>
 
       <section class="viz-section game-block" id="car-zero-replay">
-        <h2>Car Game</h2>
-
-        <h3>Zero-Sum Car Game</h3>
-        <p class="game-meta">Minimax DQN · interactive rollout</p>
+        <h2>Zero-Sum Car Game</h2>
         <p>
-          <span class="agent-p1">Player 1</span> maximizes a single scalar reward;
-          <span class="agent-p2">Player 2</span> minimizes the same quantity.
+          <span class="agent-p1">Red</span> = Player 1,
+              <span class="agent-p2">Blue</span> = Player 2 ·
+              Arrows show the planned trajectory ·
           Step through or play a rollout from trained weights.
         </p>
 
@@ -44,11 +40,6 @@
             <div class="figure-frame">
               <div id="canvas-wrap"></div>
             </div>
-            <figcaption>
-              <span class="agent-p1">Red</span> = Player 1 ·
-              <span class="agent-p2">Blue</span> = Player 2 ·
-              arrows show the planned trajectory
-            </figcaption>
           </figure>
 
           <div class="viz-controls">
@@ -58,7 +49,29 @@
               <button id="btn-forward" class="viz-btn" type="button">Forward →</button>
             </div>
             <button id="btn-random" class="viz-btn" type="button">New random start</button>
-            <button id="btn-corners" class="viz-btn" type="button">Corners (0,0) vs (4,4)</button>
+            <form id="start-form" class="viz-start-form">
+              <div class="viz-start-label">Start position</div>
+              <div class="viz-start-row">
+                <label class="viz-start-field">
+                  <span class="viz-start-agent agent-p1">P1</span>
+                  <span class="viz-coord-pair">
+                    (<span class="viz-coord-axis">x</span><input id="p1-x" type="number" min="0" max="4" value="0" aria-label="P1 x">
+                    <span class="viz-coord-sep">,</span>
+                    <span class="viz-coord-axis">y</span><input id="p1-y" type="number" min="0" max="4" value="0" aria-label="P1 y">)
+                  </span>
+                </label>
+                <label class="viz-start-field">
+                  <span class="viz-start-agent agent-p2">P2</span>
+                  <span class="viz-coord-pair">
+                    (<span class="viz-coord-axis">x</span><input id="p2-x" type="number" min="0" max="4" value="4" aria-label="P2 x">
+                    <span class="viz-coord-sep">,</span>
+                    <span class="viz-coord-axis">y</span><input id="p2-y" type="number" min="0" max="4" value="4" aria-label="P2 y">)
+                  </span>
+                </label>
+              </div>
+              <button id="btn-set-start" class="viz-btn" type="submit">Set start</button>
+              <div id="start-error" class="viz-start-error" role="alert" aria-live="polite" hidden></div>
+            </form>
             <div id="stats" class="viz-stats">Loading weights…</div>
             <div id="error" class="viz-error"></div>
           </div>
@@ -66,7 +79,7 @@
       </section>
 
       <footer class="site-footer">
-        <p>Multiple Agents &amp; Q-Networks — Jacob Gust — CS298 Directed Study</p>
+        <p>Car Game — Jacob Gust — CS298 Directed Study</p>
       </footer>
     </main>
 
@@ -87,7 +100,14 @@
       const btnBack = document.getElementById("btn-back");
       const btnForward = document.getElementById("btn-forward");
       const btnRandom = document.getElementById("btn-random");
-      const btnCorners = document.getElementById("btn-corners");
+      const startForm = document.getElementById("start-form");
+      const btnSetStart = document.getElementById("btn-set-start");
+      const p1xEl = document.getElementById("p1-x");
+      const p1yEl = document.getElementById("p1-y");
+      const p2xEl = document.getElementById("p2-x");
+      const p2yEl = document.getElementById("p2-y");
+      const startErrorEl = document.getElementById("start-error");
+      const startInputs = [p1xEl, p1yEl, p2xEl, p2yEl];
 
       let renderer = null;
       let model = null;
@@ -101,7 +121,11 @@
       function setButtonsEnabled(enabled) {
         btnPlay.disabled = !enabled;
         btnRandom.disabled = !enabled;
-        btnCorners.disabled = !enabled;
+        btnSetStart.disabled = !enabled;
+        p1xEl.disabled = !enabled;
+        p1yEl.disabled = !enabled;
+        p2xEl.disabled = !enabled;
+        p2yEl.disabled = !enabled;
         if (enabled) {
           updateStepButtons();
         } else {
@@ -116,6 +140,14 @@
         btnForward.disabled = currentStep >= maxStep;
       }
 
+      function nextArrowIndex(step) {
+        const maxStep = currentRollout.traj.length - 1;
+        if (step <= 0 || step >= maxStep) {
+          return null;
+        }
+        return step;
+      }
+
       async function goToStep(step, { animate = false } = {}) {
         if (!currentRollout.traj.length) return;
         renderer.stopPlayback();
@@ -123,6 +155,7 @@
         const target = Math.max(0, Math.min(step, maxStep));
 
         if (target === currentStep) {
+          renderer.setActiveStep(nextArrowIndex(currentStep));
           updateStepButtons();
           return;
         }
@@ -133,10 +166,12 @@
 
         if (animate && isSingleStep) {
           setButtonsEnabled(false);
+          const arrowIndex = target > currentStep ? currentStep : target;
           try {
-            await renderer.animateStep(from, to, 450);
+            await renderer.animateStep(from, to, arrowIndex, 450);
           } finally {
             currentStep = target;
+            renderer.setActiveStep(nextArrowIndex(currentStep));
             if (currentInfo) {
               updateStats(currentInfo, currentStep);
             }
@@ -147,6 +182,7 @@
 
         currentStep = target;
         renderer.setCars(to);
+        renderer.setActiveStep(nextArrowIndex(currentStep));
         if (currentInfo) {
           updateStats(currentInfo, currentStep);
         }
@@ -174,9 +210,7 @@
       function scoreAtState(state) {
         return {
           p1Grid: env.cellGridReward(state[0], state[1]),
-          p2Grid: env.cellGridReward(state[2], state[3]),
           p1Dist: env.manhattanToCenter(state[0], state[1]),
-          p2Dist: env.manhattanToCenter(state[2], state[3]),
         };
       }
 
@@ -208,6 +242,9 @@
         const stepInfo = step > 0 ? currentRollout.steps[step - 1] : null;
         const lastReward = stepInfo ? stepInfo.reward : null;
         const cumulative = stepInfo ? stepInfo.cumulativeReward : 0;
+        const breakdown = stepInfo
+          ? env.rewardBreakdown(stepInfo.from, stepInfo.a1, stepInfo.a2)
+          : null;
 
         statsEl.innerHTML = `
           <div><strong>Start:</strong>
@@ -216,34 +253,83 @@
           </div>
           <div><strong>Step:</strong> ${step} / ${info.moves}</div>
           <hr class="stats-rule">
-          <div><strong>Scores (training rewards)</strong></div>
+          <div><strong>Cell values (position only)</strong></div>
           <div><span class="agent-p1">P1 cell value:</span> ${fmt(scores.p1Grid)}
             <span class="muted">(dist ${scores.p1Dist})</span></div>
-          <div><span class="agent-p2">P2 cell value:</span> ${fmt(scores.p2Grid)}
-            <span class="muted">(dist ${scores.p2Dist})</span></div>
-          <div><strong>Step reward:</strong> ${lastReward === null ? "—" : fmt(lastReward)}</div>
+          <div><strong>Step reward (shared scalar):</strong> ${lastReward === null ? "—" : fmt(lastReward)}</div>
+          ${breakdown && !breakdown.crashed ? `
+          <div class="stats-note">
+            = P1 landing cell (${fmt(breakdown.p1LandingGrid)})
+            + living (${fmt(breakdown.livingCost)})
+            ${breakdown.p1Stay ? `+ P1 stay (${fmt(breakdown.p1Stay)})` : ""}
+            ${breakdown.p2Stay ? `+ P2 stay (${fmt(breakdown.p2Stay)})` : ""}
+          </div>` : ""}
+          ${breakdown?.crashed ? `<div class="stats-note">Crash penalty</div>` : ""}
           <div><strong>Cumulative (P1 ↑ / P2 ↓):</strong> ${fmt(cumulative)}</div>
           <hr class="stats-rule">
           <div><strong>Total moves:</strong> ${info.moves}</div>
-          <div><span class="agent-p1">P1 moves:</span> ${info.p1Moves}</div>
-          <div><span class="agent-p2">P2 moves:</span> ${info.p2Moves}</div>
           <div><strong>Unique states:</strong> ${info.unique}</div>
           <div><strong>Ended in crash:</strong> ${info.crashed ? "yes" : "no"}</div>
           <p class="stats-note">
-            Cell value = grid reward from Manhattan distance to center.
-            Zero-sum step reward also includes living cost and stay penalties.
+            
           </p>
         `;
       }
 
+      function clearStartError() {
+        startErrorEl.textContent = "";
+        startErrorEl.hidden = true;
+        startForm.classList.remove("viz-start-form--invalid");
+        for (const input of startInputs) {
+          input.removeAttribute("aria-invalid");
+          input.removeAttribute("aria-describedby");
+        }
+      }
+
+      function showStartError(message) {
+        startErrorEl.textContent = message;
+        startErrorEl.hidden = false;
+        startForm.classList.add("viz-start-form--invalid");
+        for (const input of startInputs) {
+          input.setAttribute("aria-invalid", "true");
+          input.setAttribute("aria-describedby", "start-error");
+        }
+      }
+
+      function syncStartInputs(state) {
+        p1xEl.value = state[0];
+        p1yEl.value = state[1];
+        p2xEl.value = state[2];
+        p2yEl.value = state[3];
+      }
+
+      function parseStartState() {
+        const coords = [
+          Number(p1xEl.value),
+          Number(p1yEl.value),
+          Number(p2xEl.value),
+          Number(p2yEl.value),
+        ];
+        const max = GRID_SIZE - 1;
+        if (coords.some((n) => !Number.isInteger(n) || n < 0 || n > max)) {
+          throw new Error(`Coordinates must be integers from 0 to ${max}.`);
+        }
+        if (coords[0] === coords[2] && coords[1] === coords[3]) {
+          throw new Error("Players cannot start in the same cell.");
+        }
+        return coords;
+      }
+
       function runRollout(startState) {
         renderer?.stopPlayback();
+        clearStartError();
         currentRollout = rolloutDetailed(env, model, startState, HORIZON);
         currentInfo = summarize(currentRollout.traj, startState);
         currentStep = 0;
+        syncStartInputs(startState);
         updateStats(currentInfo, 0);
         renderer.setCars(startState);
-        renderer.drawTrail(currentRollout.traj);
+        renderer.drawTrail(currentRollout.traj, null);
         updateStepButtons();
         return currentInfo;
       }
@@ -252,13 +338,18 @@
         if (!currentRollout.traj.length) return;
         renderer.stopPlayback();
         setButtonsEnabled(false);
+        currentStep = 0;
         const info = currentInfo ?? summarize(currentRollout.traj, currentRollout.traj[0]);
-        await renderer.playTrajectory(currentRollout.traj, 450, (step) => {
-          currentStep = step;
-          updateStats(info, step);
-          updateStepButtons();
-        });
-        setButtonsEnabled(true);
+        try {
+          await renderer.playTrajectory(currentRollout.traj, 450, (step) => {
+            currentStep = step;
+            updateStats(info, step);
+            updateStepButtons();
+          });
+        } finally {
+          renderer.setActiveStep(nextArrowIndex(currentStep));
+          setButtonsEnabled(true);
+        }
       }
 
       btnPlay.addEventListener("click", () => {
@@ -271,14 +362,16 @@
       btnForward.addEventListener("click", stepForward);
       btnRandom.addEventListener("click", () => {
         startIdx = Math.floor(Math.random() * starts.length);
+        errorEl.textContent = "";
         runRollout(starts[startIdx]);
       });
-      btnCorners.addEventListener("click", () => {
-        startIdx = starts.findIndex(
-          (s) => s[0] === 0 && s[1] === 0 && s[2] === 4 && s[3] === 4,
-        );
-        if (startIdx < 0) startIdx = 0;
-        runRollout(starts[startIdx]);
+      startForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        try {
+          runRollout(parseStartState());
+        } catch (err) {
+          showStartError(err.message);
+        }
       });
 
       async function init() {

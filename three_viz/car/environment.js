@@ -59,19 +59,35 @@ export function createCarEnv(gridSize = 5) {
 
     /** Zero-sum scalar reward (P1 maximizes, P2 minimizes). */
     rewardZerosum(state, a1, a2) {
+      return this.rewardBreakdown(state, a1, a2).total;
+    },
+
+    /** Terms that sum to rewardZerosum (for display). */
+    rewardBreakdown(state, a1, a2) {
       const [x1, y1, x2, y2] = state;
       const sn = this.transition(state, a1, a2);
       if (sn[0] === sn[2] && sn[1] === sn[3]) {
-        return CRASH_PENALTY;
+        return {
+          total: CRASH_PENALTY,
+          p1LandingGrid: 0,
+          livingCost: 0,
+          p1Stay: 0,
+          p2Stay: 0,
+          crashed: true,
+        };
       }
-      let r = gridReward[sn[0]][sn[1]] - LIVING_COST;
-      if (sn[0] === x1 && sn[1] === y1) {
-        r += STAY_PENALTY;
-      }
-      if (sn[2] === x2 && sn[3] === y2) {
-        r -= STAY_PENALTY;
-      }
-      return r;
+      const p1LandingGrid = gridReward[sn[0]][sn[1]];
+      const livingCost = -LIVING_COST;
+      const p1Stay = sn[0] === x1 && sn[1] === y1 ? STAY_PENALTY : 0;
+      const p2Stay = sn[2] === x2 && sn[3] === y2 ? -STAY_PENALTY : 0;
+      return {
+        total: p1LandingGrid + livingCost + p1Stay + p2Stay,
+        p1LandingGrid,
+        livingCost,
+        p1Stay,
+        p2Stay,
+        crashed: false,
+      };
     },
 
     isCollision(state) {

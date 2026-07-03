@@ -10,10 +10,15 @@
 
 .viz-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 15rem;
+  grid-template-columns: minmax(0, 1fr) 17rem;
   gap: 1.25rem 2rem;
   align-items: start;
   margin-top: 1rem;
+}
+
+.viz-controls {
+  min-width: 0;
+  max-width: 17rem;
 }
 
 figure.viz-figure {
@@ -33,13 +38,15 @@ figure.viz-figure {
   overflow: hidden;
   max-width: none;
   width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
 }
 
 #canvas-wrap {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: clamp(32rem, min(85vh, 80vw), 52rem);
-  min-height: 32rem;
-  position: relative;
+  height: 100%;
   background: var(--surface);
 }
 
@@ -49,10 +56,6 @@ figure.viz-figure {
   display: block;
   width: 100% !important;
   height: 100% !important;
-}
-
-.viz-controls {
-  min-width: 0;
 }
 
 .viz-btn {
@@ -67,6 +70,7 @@ figure.viz-figure {
   border: 1px solid var(--border);
   cursor: pointer;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .viz-btn:hover:not(:disabled) {
@@ -89,8 +93,91 @@ figure.viz-figure {
   margin-bottom: 0;
 }
 
+.viz-start-form {
+  margin: 0.5rem 0;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--rule);
+  box-sizing: border-box;
+}
+
+.viz-start-label {
+  margin-bottom: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.viz-start-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.viz-start-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.viz-start-agent {
+  flex: 0 0 1.4rem;
+  font-weight: 600;
+}
+
+.viz-coord-pair {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-coord-axis {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.viz-coord-sep {
+  margin: 0 0.05rem;
+  color: var(--muted);
+}
+
+.viz-coord-pair input {
+  width: 2.15rem;
+  padding: 0.28rem 0.25rem;
+  font-family: var(--font-serif);
+  font-size: 0.88rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.viz-coord-pair input:disabled {
+  opacity: 0.45;
+}
+
+.viz-start-form .viz-btn {
+  margin-bottom: 0;
+}
+
+.viz-start-error {
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--p1);
+}
+
+.viz-start-form--invalid .viz-coord-pair input {
+  border-color: var(--p1);
+}
+
 .viz-stats {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   padding: 0.75rem 0.85rem;
   font-size: 0.9rem;
   line-height: 1.65;
@@ -99,6 +186,7 @@ figure.viz-figure {
   hyphens: none;
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid var(--rule);
+  box-sizing: border-box;
 }
 
 .viz-stats strong {
@@ -133,8 +221,7 @@ figure.viz-figure {
     grid-template-columns: 1fr;
   }
 
-  #canvas-wrap {
-    height: clamp(24rem, 70vh, 40rem);
-    min-height: 24rem;
+  .viz-controls {
+    max-width: none;
   }
 }
