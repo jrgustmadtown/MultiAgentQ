@@ -18,6 +18,9 @@ def distance(p1, p2):
     return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 
+PLAYER_RADIUS = 0.022
+
+
 class DogGame:
     """
     Dog Game Environment.
@@ -33,10 +36,11 @@ class DogGame:
         self.house2 = house2 if house2 else DEFAULT_HOUSE2
 
     def move(self, x, y, action):
-        """Apply action and clamp to [0, 1]."""
+        """Apply action and clamp so the player disc stays inside [0, 1]²."""
         dx, dy = ACTION_DIRS[action]
-        x_new = np.clip(x + dx * self.step_size, 0, 1)
-        y_new = np.clip(y + dy * self.step_size, 0, 1)
+        lo, hi = PLAYER_RADIUS, 1 - PLAYER_RADIUS
+        x_new = np.clip(x + dx * self.step_size, lo, hi)
+        y_new = np.clip(y + dy * self.step_size, lo, hi)
         return x_new, y_new
 
     def transition(self, s, a1, a2):
@@ -54,5 +58,12 @@ class DogGame:
         return r1, r2
 
     def sample_state(self):
-        """Sample a uniform random state in [0, 1]^4."""
-        return (random.random(), random.random(), random.random(), random.random())
+        """Sample a uniform random state with room for player radius at edges."""
+        lo = PLAYER_RADIUS
+        span = 1 - 2 * PLAYER_RADIUS
+        return (
+            lo + random.random() * span,
+            lo + random.random() * span,
+            lo + random.random() * span,
+            lo + random.random() * span,
+        )

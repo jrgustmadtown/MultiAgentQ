@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { dogPosition, DEFAULT_HOUSE1, DEFAULT_HOUSE2 } from "./environment.js";
+import { dogPosition, DEFAULT_HOUSE1, DEFAULT_HOUSE2, clampPosition } from "./environment.js";
 
 const P1_COLOR = 0xa93226;
 const P2_COLOR = 0x2471a3;
@@ -73,6 +73,10 @@ export class DogReplayRenderer {
     this.controls.enableZoom = false;
     this.controls.target.set(this.arenaCenter, 0, this.arenaCenter);
     this.controls.update();
+
+    this.renderer.domElement.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
 
     this._updateCamera(w / h);
     this._buildArena();
@@ -430,9 +434,7 @@ export class DogReplayRenderer {
     if (!this._raycaster.ray.intersectPlane(this._dragPlane, this._planeHit)) {
       return [0, 0];
     }
-    const sx = Math.max(0, Math.min(1, this._planeHit.x));
-    const sy = Math.max(0, Math.min(1, 1 - this._planeHit.z));
-    return [sx, sy];
+    return clampPosition(this._planeHit.x, 1 - this._planeHit.z);
   }
 
   _setPointerNdc(event) {

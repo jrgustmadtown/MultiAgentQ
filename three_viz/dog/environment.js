@@ -10,6 +10,8 @@ export const STEP_SIZE = 0.1;
 export const DEFAULT_HORIZON = 30;
 export const DEFAULT_HOUSE1 = [0.25, 0.25];
 export const DEFAULT_HOUSE2 = [0.75, 0.75];
+/** Capsule radius in state coords — matches 3D pill on the 1×1 arena. */
+export const PLAYER_RADIUS = 0.022;
 
 export const ACTION_NAMES = [
   "Stay", "E", "ENE", "NE", "NNE", "N", "NNW", "NW", "WNW",
@@ -37,8 +39,13 @@ function distance(p1, p2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function clamp01(v) {
-  return Math.max(0, Math.min(1, v));
+export function clampPosition(x, y) {
+  const lo = PLAYER_RADIUS;
+  const hi = 1 - PLAYER_RADIUS;
+  return [
+    Math.max(lo, Math.min(hi, x)),
+    Math.max(lo, Math.min(hi, y)),
+  ];
 }
 
 export function createDogEnv(options = {}) {
@@ -48,10 +55,7 @@ export function createDogEnv(options = {}) {
 
   function move(x, y, action) {
     const [dx, dy] = ACTION_DIRS[action];
-    return [
-      clamp01(x + dx * stepSize),
-      clamp01(y + dy * stepSize),
-    ];
+    return clampPosition(x + dx * stepSize, y + dy * stepSize);
   }
 
   return {
@@ -77,7 +81,14 @@ export function createDogEnv(options = {}) {
     },
 
     sampleState() {
-      return [Math.random(), Math.random(), Math.random(), Math.random()];
+      const lo = PLAYER_RADIUS;
+      const span = 1 - 2 * PLAYER_RADIUS;
+      return [
+        lo + Math.random() * span,
+        lo + Math.random() * span,
+        lo + Math.random() * span,
+        lo + Math.random() * span,
+      ];
     },
   };
 }
