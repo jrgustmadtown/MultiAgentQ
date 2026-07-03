@@ -24,21 +24,19 @@
         <h2>Overview</h2>
         <p class="lede">
           This project explores how two agents act when making simultaneous choices in a game.
-          The agents learn through neural planning: using a neural network as a compact stand-in for a Q-value table.
+          The agents learn through neural planning by using a neural network as a compact stand-in for a Q-value table in Q-Learning.
           The planner repeatedly picks random states, asks the environment model what would happen for each joint action,
-          and works out what each Q-value should be.
-          Those ideal values are the training labels and the network is adjusted so its predictions move closer to them.
+          and determines what each Q-value should be.
+          Those values are the training labels and the network is adjusted so its predictions move closer to them.
           After enough iterations, the fitted network supports a policy without storing every state explicitly.
         </p>
         <p>
-          I provide two primary environments and two modes for each environment. The environments and modes 
-          differ in payoff structure. The planning loop adapts the bootstrap
+          The planning loop adapts the bootstrap
           operator used to compute next-state values and the rule used to extract actions at
           policy time.
           Nash equilibria in small action spaces are computed exactly at policy extraction
           time via support enumeration, with a uniform-strategy fallback when no equilibrium
-          is found. During planning a faster iterated best-response approximation keeps
-          computation tractable.
+          is found. During planning a faster iterated best-response approximation is used for efficiency.
         </p>
       </section>
 
@@ -220,7 +218,7 @@
       </section>
 
       <section id="doggame">
-        <h2>Dog Game · <a href="three_viz/dog/replay.html"><em>Visualization (competitive)</em></a></h2>
+        <h2>Dog Game · <a href="three_viz/dog/replay.html"><em>Visualization</em></a></h2>
         <p>
           The dog game is a continuous game played on the unit square [0, 1]². Each player
           controls a position in the plane. The state is all four coordinates. Each step both
@@ -228,14 +226,9 @@
           22.5° for a distance of 0.1. A <span class="agent-dog">dog</span> sits at the midpoint of the two players. The <span class="agent-dog">dog</span>'s position
           is updated as the players move. 
         </p>
-        <p>
-          Because the state space is continuous, Q-values cannot be stored in a table; neural
-          networks generalize across states sampled during planning (with mild boundary bias).
-          Two variants share the <span class="agent-dog">dog</span> at the midpoint of the players mechanic but differ in objectives and obstacles.
-        </p>
 
         <div class="game-block" id="dog-competitive">
-          <h3>Competitive Dog Game</h3>
+          <h3>Dog Game</h3>
           <p class="game-meta">Nash-Q</p>
 
           <div class="with-figure">
@@ -322,80 +315,6 @@
           </div>
         </div>
 
-        <div class="game-block" id="dog-coop">
-          <h3>Cooperative Dog Game</h3>
-          <p class="game-meta">Joint Q-planning</p>
-
-          <div class="with-figure">
-            <div>
-              <p>
-                Both player's goal is to move the <span class="agent-dog">dog</span> to a single house. A wall segment blocks direct paths; player
-                movement and the <span class="agent-dog">dog</span> midpoint respect collision geometry, with blocked motion
-                sliding tangentially along the wall. Both receive identical reward: the negative
-                distance to the house, plus a bonus when the <span class="agent-dog">dog</span> enters a success radius.
-              </p>
-              <p>
-                States are four coordinates in [0, 1]². Two networks share architecture
-                4 → 256 → 256 → 289, outputting
-                <span class="agent-p1">Q₁</span> and <span class="agent-p2">Q₂</span> over all
-                17×17 joint actions.
-              </p>
-              <p>
-                Each iteration draws a random state. For all 289 joint actions, the environment
-                returns a shared reward <em>r</em> and the next state. The cooperative backup
-                picks the joint action maximizing the sum of target-network Q-values:
-              </p>
-              <p class="formula">
-                (<em>a</em><sub class="sub-p1">1</sub>*, <em>a</em><sub class="sub-p2">2</sub>*) =
-                argmax (<span class="agent-p1">Q₁</span> + <span class="agent-p2">Q₂</span>)
-              </p>
-              <p>
-                The Bellman targets use the Q-values at that best joint action:
-              </p>
-              <p class="formula">
-                <span class="agent-p1">target₁</span> = <em>r</em> + γ <span class="agent-p1">V₁</span>(<em>s</em>′),&nbsp;&nbsp;
-                <span class="agent-p2">target₂</span> = <em>r</em> + γ <span class="agent-p2">V₂</span>(<em>s</em>′),&nbsp;&nbsp;γ = 0.9
-              </p>
-              <p>
-                Targets are stored in separate replay buffers; mini-batches update each network
-                with Smooth L1 loss, Adam (lr 5×10⁻⁴ with warmup then decay), and gradient
-                clipping. Target networks use soft Polyak updates (τ = 0.001).
-              </p>
-              <p>
-                At policy time, the joint action maximizing
-                <span class="agent-p1">Q₁</span> + <span class="agent-p2">Q₂</span> is chosen.
-                Rollouts terminate early when the <span class="agent-dog">dog</span> reaches the success radius around the house.
-              </p>
-            </div>
-
-            <div class="figure-stack">
-              <figure>
-                <div class="figure-frame">
-                  <img
-                    src="doggame_coop/rollout_1.png"
-                    alt="Cooperative dog game rollout navigating toward a house"
-                  >
-                </div>
-                <figcaption>
-                  <span class="agent-dog">Dog</span> is stuck at the closest position to the house behind the wall
-                  <br> Players were unable to learn a policy that allows the <span class="agent-dog">dog</span> to navigate around the wall
-                </figcaption>
-              </figure>
-              <figure>
-                <div class="figure-frame">
-                  <img
-                    src="doggame_coop/rollout_5.png"
-                    alt="Second cooperative dog game rollout"
-                  >
-                </div>
-                <figcaption>
-                  <span class="agent-dog">Dog</span> reaches the house
-                  <br> Players start in positions such that the wall poses minimal obstruction
-                </figcaption>
-              </figure>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section id="limitations">
@@ -410,15 +329,11 @@
         <p>
           Function approximation introduces error. A finite number of planning iterations
           and sampled states cannot guarantee convergence to exact minimax or Nash values,
-          especially in the continuous dog games where the state space is not enumerated. When
+          especially in the dog game where the state space is not enumerated. When
           multiple equilibria exist, only one is selected at policy time.
         </p>
         <p>
-          The action spaces for the continous dog games is limited to a single step size and 16 angles.
-          The cooperative dog game models the wall as a single segment and simplified collision handling rather than full physics.
-        </p>
-        <p>
-          The cooperative dog game is not fully fleshed out.
+          The action spaces for the continous dog game is limited to a single step size and 16 angles.
         </p>
         <h3>Future Work</h3>
         <p>
@@ -430,14 +345,6 @@
         <p>
           More comparison of these results with typical single network results would
           better flesh out the benefits and demerits of using multiple networks.
-        </p>
-        <p>
-          The environemnt and algorithm for the cooperative dog game can be expanded and tweaked to demonstrate
-          better learning and more complex behavior.
-        </p>
-        <p>
-          Visualizations of the games in Three.js will allow for more
-          interactive and clear representation of the games.
         </p>
       </section>
 
