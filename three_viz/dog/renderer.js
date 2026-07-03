@@ -1,9 +1,15 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { dogPosition, DEFAULT_HOUSE1, DEFAULT_HOUSE2 } from "./environment.js";
 
-// Match style.css agent colors and paper palette.
 const P1_COLOR = 0xa93226;
 const P2_COLOR = 0x2471a3;
+const DOG_COLOR = 0x008000;
+const DOG_TRAIL = DOG_COLOR;
+const DOG_TRAIL_OPACITY = 0.85;
+const HOUSE_OPACITY = 0.45;
+const HOUSE1_COLOR = 0xc0392b;
+const HOUSE2_COLOR = 0x2471a3;
 const P1_TRAIL = 0xc0392b;
 const P2_TRAIL = 0x5dade2;
 const P1_ACTIVE = 0xff2d2d;
@@ -15,19 +21,29 @@ const TRAIL_OPACITY = 0.68;
 const ACTIVE_OPACITY = 0.84;
 const ACTIVE_HEAD_LENGTH_SCALE = 1.12;
 const ACTIVE_HEAD_WIDTH_SCALE = 2.2;
-const THICK_SHAFT_RADIUS = 0.018;
-const HEAD_LENGTH = 0.14;
-const HEAD_WIDTH = 0.08;
-const OFFSET = 0.12;
+const THICK_SHAFT_RADIUS = 0.0025;
+const HEAD_LENGTH = 0.028;
+const HEAD_WIDTH = 0.015;
+const DOG_HEAD_LENGTH = 0.024;
+const DOG_HEAD_WIDTH = 0.013;
+const ARENA = 1;
+const VIEW_PADDING = 1.12;
 
-function cellCenter(x, y) {
-  return new THREE.Vector3(x + 0.5, 0, y + 0.5);
+/** Map state (x,y) in [0,1]² to world XZ — matches matplotlib doggame/visualization.py (y up). */
+function stateToWorldXZ(sx, sy) {
+  return [sx, 1 - sy];
 }
 
-export class CarReplayRenderer {
-  constructor(container, gridSize = 5) {
-    this.gridSize = gridSize;
+function worldPos(sx, sy, y = 0.1) {
+  const [wx, wz] = stateToWorldXZ(sx, sy);
+  return new THREE.Vector3(wx, y, wz);
+}
+
+export class DogReplayRenderer {
+  constructor(container, options = {}) {
     this.container = container;
+    this.house1 = options.house1 ?? DEFAULT_HOUSE1;
+    this.house2 = options.house2 ?? DEFAULT_HOUSE2;
     this.trailGroup = new THREE.Group();
     this.trailSteps = [];
     this.renderLoopId = null;
@@ -38,13 +54,13 @@ export class CarReplayRenderer {
 
     const w = Math.max(container.clientWidth, 1);
     const h = Math.max(container.clientHeight, 1);
-    this.halfGrid = gridSize / 2;
-    this.gridCenter = gridSize / 2;
+    this.halfArena = ARENA / 2;
+    this.arenaCenter = ARENA / 2;
 
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-    this.camera.position.set(this.gridCenter, 10, this.gridCenter);
+    this.camera.position.set(this.arenaCenter, 10, this.arenaCenter);
     this.camera.up.set(0, 0, -1);
-    this.camera.lookAt(this.gridCenter, 0, this.gridCenter);
+    this.camera.lookAt(this.arenaCenter, 0, this.arenaCenter);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -55,20 +71,42 @@ export class CarReplayRenderer {
     this.controls.enablePan = false;
     this.controls.enableRotate = false;
     this.controls.enableZoom = false;
-    this.controls.target.set(this.gridCenter, 0, this.gridCenter);
+    this.controls.target.set(this.arenaCenter, 0, this.arenaCenter);
     this.controls.update();
 
     this._updateCamera(w / h);
-
-    this._buildGrid();
+    this._buildArena();
     this.scene.add(this.trailGroup);
-    this.labelOverlay = null;
 
-    const carGeo = new THREE.BoxGeometry(0.4, 0.12, 0.4);
-    this.car1 = new THREE.Mesh(carGeo, new THREE.MeshBasicMaterial({ color: P1_COLOR }));
-    this.car2 = new THREE.Mesh(carGeo, new THREE.MeshBasicMaterial({ color: P2_COLOR }));
-    this.scene.add(this.car1);
-    this.scene.add(this.car2);
+    const playerGeo = new THREE.BoxGeometry(0.026, 0.026, 0.026);
+    this.player1 = new THREE.Mesh(playerGeo, new THREE.MeshBasicMaterial({ color: P1_COLOR }));
+    this.player2 = new THREE.Mesh(playerGeo, new THREE.MeshBasicMaterial({ color: P2_COLOR }));
+    this.dog = new THREE.Mesh(
+      new THREE.SphereGeometry(0.014, 12, 12),
+      new THREE.MeshBasicMaterial({ color: DOG_COLOR }),
+    );
+
+    const hitGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.hit1 = new THREE.Mesh(hitGeo, hitMat);
+    this.hit2 = new THREE.Mesh(hitGeo, hitMat.clone());
+    this.hit1.userData.playerId = 1;
+    this.hit2.userData.playerId = 2;
+
+    this.scene.add(this.hit1);
+    this.scene.add(this.hit2);
+    this.scene.add(this.player1);
+    this.scene.add(this.player2);
+    this.scene.add(this.dog);
+
+    this._raycaster = new THREE.Raycaster();
+    this._pointerNdc = new THREE.Vector2();
+    this._dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this._planeHit = new THREE.Vector3();
 
     this._onResize = () => this.resize();
     window.addEventListener("resize", this._onResize);
@@ -78,77 +116,71 @@ export class CarReplayRenderer {
     this._startRenderLoop();
   }
 
-  _buildGrid() {
+  get domElement() {
+    return this.renderer.domElement;
+  }
+
+  _buildArena() {
     const group = new THREE.Group();
     const lineMat = new THREE.LineBasicMaterial({ color: GRID_LINE });
     const borderMat = new THREE.LineBasicMaterial({ color: GRID_BORDER });
 
-    for (let i = 0; i <= this.gridSize; i++) {
-      const a = new THREE.Vector3(i, 0.01, 0);
-      const b = new THREE.Vector3(i, 0.01, this.gridSize);
-      const c = new THREE.Vector3(0, 0.01, i);
-      const d = new THREE.Vector3(this.gridSize, 0.01, i);
-      const mat = i === 0 || i === this.gridSize ? borderMat : lineMat;
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      const a = new THREE.Vector3(t, 0.01, 0);
+      const b = new THREE.Vector3(t, 0.01, ARENA);
+      const c = new THREE.Vector3(0, 0.01, t);
+      const d = new THREE.Vector3(ARENA, 0.01, t);
+      const mat = i === 0 || i === 4 ? borderMat : lineMat;
       group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), mat));
       group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([c, d]), mat));
     }
 
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(this.gridSize, this.gridSize),
+      new THREE.PlaneGeometry(ARENA, ARENA),
       new THREE.MeshBasicMaterial({ color: BG_COLOR }),
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(this.gridSize / 2, 0, this.gridSize / 2);
+    floor.position.set(ARENA / 2, 0, ARENA / 2);
     group.add(floor);
+
+    group.add(this._houseMarker(this.house1, HOUSE1_COLOR));
+    group.add(this._houseMarker(this.house2, HOUSE2_COLOR));
     this.scene.add(group);
   }
 
-  /** Build bottom-left cell value labels from gridReward[x][y]. */
-  setGridRewards(gridReward) {
-    if (this.labelOverlay) {
-      this.container.removeChild(this.labelOverlay);
-      this.labelOverlay = null;
-    }
-    if (!gridReward) {
-      return;
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "grid-reward-labels";
-    overlay.style.setProperty("--grid-n", String(this.gridSize));
-    overlay.hidden = true;
-
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let y = 0; y < this.gridSize; y++) {
-        const label = document.createElement("span");
-        label.className = "grid-reward-label";
-        label.style.setProperty("--cell-x", String(x));
-        label.style.setProperty("--cell-y", String(y));
-        label.textContent = gridReward[x][y].toFixed(2);
-        overlay.appendChild(label);
-      }
-    }
-
-    this.container.appendChild(overlay);
-    this.labelOverlay = overlay;
+  _houseMarker([sx, sy], color) {
+    const [x, z] = stateToWorldXZ(sx, sy);
+    const g = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.018, 0.026, 4),
+      new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: HOUSE_OPACITY,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.02, z);
+    g.add(ring);
+    return g;
   }
 
-  setShowGridRewards(show) {
-    if (this.labelOverlay) {
-      this.labelOverlay.hidden = !show;
-    }
+  _actorPositions(state) {
+    const p1 = worldPos(state[0], state[1]);
+    const p2 = worldPos(state[2], state[3]);
+    const dog = worldPos(...dogPosition(state), 0.08);
+    return { p1, p2, dog };
   }
 
-  _carPositions(state) {
-    const p1 = cellCenter(state[0], state[1]).add(new THREE.Vector3(OFFSET, 0.1, OFFSET));
-    const p2 = cellCenter(state[2], state[3]).add(new THREE.Vector3(-OFFSET, 0.1, -OFFSET));
-    return { p1, p2 };
-  }
-
-  setCars(state) {
-    const { p1, p2 } = this._carPositions(state);
-    this.car1.position.copy(p1);
-    this.car2.position.copy(p2);
+  setActors(state) {
+    const { p1, p2, dog } = this._actorPositions(state);
+    this.player1.position.copy(p1);
+    this.player2.position.copy(p2);
+    this.hit1.position.copy(p1);
+    this.hit2.position.copy(p2);
+    this.dog.position.copy(dog);
   }
 
   clearTrail() {
@@ -178,19 +210,29 @@ export class CarReplayRenderer {
     for (let i = 0; i < total; i++) {
       const s = traj[i];
       const sn = traj[i + 1];
+      const dog0 = dogPosition(s);
+      const dog1 = dogPosition(sn);
       const p1 = this._addArrow(
-        cellCenter(s[0], s[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
-        cellCenter(sn[0], sn[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
+        worldPos(s[0], s[1], 0.05),
+        worldPos(sn[0], sn[1], 0.05),
         P1_TRAIL,
         TRAIL_OPACITY,
       );
       const p2 = this._addArrow(
-        cellCenter(s[2], s[3]).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
-        cellCenter(sn[2], sn[3]).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
+        worldPos(s[2], s[3], 0.05),
+        worldPos(sn[2], sn[3], 0.05),
         P2_TRAIL,
         TRAIL_OPACITY,
       );
-      this.trailSteps.push({ p1, p2, index: i });
+      const dog = this._addArrow(
+        worldPos(dog0[0], dog0[1], 0.06),
+        worldPos(dog1[0], dog1[1], 0.06),
+        DOG_TRAIL,
+        DOG_TRAIL_OPACITY,
+        DOG_HEAD_LENGTH,
+        DOG_HEAD_WIDTH,
+      );
+      this.trailSteps.push({ p1, p2, dog, index: i });
     }
 
     this.setActiveStep(activeStep);
@@ -201,7 +243,6 @@ export class CarReplayRenderer {
       new THREE.CylinderGeometry(THICK_SHAFT_RADIUS, THICK_SHAFT_RADIUS, shaftLen, 6),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 1 }),
     );
-    // ArrowHelper line runs along local +Y (three@0.160).
     shaft.position.y = shaftLen / 2;
     return shaft;
   }
@@ -250,7 +291,6 @@ export class CarReplayRenderer {
     }
   }
 
-  /** Highlight the arrow for step index (move traj[i] → traj[i+1]). null = none. */
   setActiveStep(stepIndex) {
     this.activeStep = stepIndex;
     for (const { p1, p2, index } of this.trailSteps) {
@@ -270,7 +310,7 @@ export class CarReplayRenderer {
     }
   }
 
-  _addArrow(from, to, color, opacity) {
+  _addArrow(from, to, color, opacity, headLength = HEAD_LENGTH, headWidth = HEAD_WIDTH) {
     const dir = to.clone().sub(from);
     const len = dir.length();
     if (len < 1e-6) {
@@ -282,8 +322,8 @@ export class CarReplayRenderer {
       from,
       len,
       color,
-      HEAD_LENGTH,
-      HEAD_WIDTH,
+      headLength,
+      headWidth,
     );
     helper.line.material.opacity = opacity;
     helper.line.material.transparent = true;
@@ -304,9 +344,8 @@ export class CarReplayRenderer {
 
   async _animateSegment(fromState, toState, stepMs) {
     const token = this.playToken;
-    const start1 = this.car1.position.clone();
-    const start2 = this.car2.position.clone();
-    const end = this._carPositions(toState);
+    const start = this._actorPositions(fromState);
+    const end = this._actorPositions(toState);
     const t0 = performance.now();
 
     await new Promise((resolve) => {
@@ -316,9 +355,9 @@ export class CarReplayRenderer {
           return;
         }
         const t = Math.min(1, (now - t0) / stepMs);
-        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        this.car1.position.lerpVectors(start1, end.p1, ease);
-        this.car2.position.lerpVectors(start2, end.p2, ease);
+        this.player1.position.lerpVectors(start.p1, end.p1, t);
+        this.player2.position.lerpVectors(start.p2, end.p2, t);
+        this.dog.position.lerpVectors(start.dog, end.dog, t);
         if (t < 1) {
           requestAnimationFrame(tick);
         } else {
@@ -329,44 +368,40 @@ export class CarReplayRenderer {
     });
   }
 
-  /** Animate one step between two states (used by forward/back controls). */
   async animateStep(fromState, toState, stepIndex, stepMs = 450) {
     this.stopPlayback();
     this.setActiveStep(stepIndex);
     await this._animateSegment(fromState, toState, stepMs);
   }
 
-  async playTrajectory(traj, stepMs = 450, onStep) {
-    this.stopPlayback();
-    const token = this.playToken;
+  async playTrajectory(traj, stepMs = 400, onStep) {
+    const token = ++this.playToken;
+    const segments = traj.length - 1;
     this.drawTrail(traj, null);
-    this.setCars(traj[0]);
+    this.setActors(traj[0]);
 
-    try {
-      for (let i = 0; i < traj.length - 1; i++) {
-        if (token !== this.playToken) {
-          return;
-        }
+    if (segments <= 0) {
+      return;
+    }
 
-        this.setActiveStep(i);
-        await this._animateSegment(traj[i], traj[i + 1], stepMs);
-        if (token !== this.playToken) {
-          return;
-        }
-        onStep?.(i + 1, traj[i + 1]);
-        this.setActiveStep(null);
+    for (let i = 0; i < segments; i++) {
+      if (token !== this.playToken) {
+        return;
       }
-    } finally {
-      if (token === this.playToken) {
-        this.setCars(traj[traj.length - 1]);
-        this.drawTrail(traj, null);
+      await this._animateSegment(traj[i], traj[i + 1], stepMs);
+      if (token !== this.playToken) {
+        return;
       }
+      onStep?.(i + 1, traj[i + 1]);
+    }
+
+    if (token === this.playToken) {
+      this.setActors(traj[traj.length - 1]);
     }
   }
 
   _updateCamera(aspect) {
-    const half = this.halfGrid;
-    // Fit square grid [0, gridSize] edge-to-edge; equal scale on X and Z.
+    const half = this.halfArena * VIEW_PADDING;
     if (aspect >= 1) {
       this.camera.top = half;
       this.camera.bottom = -half;
@@ -388,6 +423,36 @@ export class CarReplayRenderer {
     this.renderer.setSize(w, h);
   }
 
+  /** Map a pointer event on the canvas to state coordinates in [0, 1]². */
+  pickStateFromPointer(event) {
+    this._setPointerNdc(event);
+    this._raycaster.setFromCamera(this._pointerNdc, this.camera);
+    if (!this._raycaster.ray.intersectPlane(this._dragPlane, this._planeHit)) {
+      return [0, 0];
+    }
+    const sx = Math.max(0, Math.min(1, this._planeHit.x));
+    const sy = Math.max(0, Math.min(1, 1 - this._planeHit.z));
+    return [sx, sy];
+  }
+
+  _setPointerNdc(event) {
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    this._pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this._pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  /** Return 1 or 2 if pointer hits a player drag target; otherwise null. */
+  pickPlayerFromPointer(event) {
+    this._setPointerNdc(event);
+    this._raycaster.setFromCamera(this._pointerNdc, this.camera);
+    const hits = this._raycaster.intersectObjects([this.hit1, this.hit2], false);
+    if (!hits.length) {
+      return null;
+    }
+    return hits[0].object.userData.playerId;
+  }
+
   _startRenderLoop() {
     const loop = () => {
       this.controls.update();
@@ -405,10 +470,6 @@ export class CarReplayRenderer {
     }
     window.removeEventListener("resize", this._onResize);
     this._resizeObserver?.disconnect();
-    if (this.labelOverlay) {
-      this.container.removeChild(this.labelOverlay);
-      this.labelOverlay = null;
-    }
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }

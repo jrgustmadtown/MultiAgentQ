@@ -21,7 +21,7 @@
     <div id="out">Loading…</div>
     <script type="module">
       import { loadWeights, qValues } from "./qnetwork.js";
-      import { createDogEnv } from "./dog/environment.js";
+      import { createDogEnv, DEFAULT_HORIZON } from "./dog/environment.js";
       import { actionsForState, rolloutDetailed } from "./dog/policy.js";
       import { ACTION_NAMES } from "./dog/environment.js";
 
@@ -71,7 +71,7 @@
         lines.push(`start: [${start.join(", ")}]`);
         lines.push(`actions: P1=${a1} (${ACTION_NAMES[a1]}), P2=${a2} (${ACTION_NAMES[a2]})`);
 
-        const { traj, steps } = rolloutDetailed(env, model1, model2, start, 10);
+        const { traj, steps } = rolloutDetailed(env, model1, model2, start, DEFAULT_HORIZON);
         lines.push(`rollout length: ${traj.length} states, ${steps.length} steps`);
         const last = steps[steps.length - 1];
         lines.push(

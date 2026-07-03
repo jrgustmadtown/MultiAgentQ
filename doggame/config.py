@@ -14,7 +14,8 @@ GRAD_CLIP_NORM = 1.0
 BATCH_SIZE = 32
 MIN_BUFFER_SIZE = 64
 GRADIENT_STEPS = 4
-DEFAULT_HORIZON = 10
+# Rollout length; step_size=0.1 → ~10 steps to cross one axis, ~15 on a diagonal.
+DEFAULT_HORIZON = 30
 
 # House positions
 DEFAULT_HOUSE1 = (0.25, 0.25)

@@ -54,16 +54,5 @@ class DogGame:
         return r1, r2
 
     def sample_state(self):
-        """
-        Sample a random state with bias toward corners/boundaries.
-        50% uniform random, 50% near boundaries.
-        """
-        if random.random() < 0.5:
-            return (random.random(), random.random(), random.random(), random.random())
-
-        def biased_coord():
-            if random.random() < 0.5:
-                return random.betavariate(0.3, 2)
-            return random.betavariate(2, 0.3)
-
-        return (biased_coord(), biased_coord(), biased_coord(), biased_coord())
+        """Sample a uniform random state in [0, 1]^4."""
+        return (random.random(), random.random(), random.random(), random.random())
