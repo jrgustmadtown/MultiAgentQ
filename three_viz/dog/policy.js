@@ -78,11 +78,11 @@ export function actionsForState(model1, model2, state) {
   return nashActionsIBRR(q1, q2);
 }
 
-export function rollout(env, model1, model2, startState, horizon = 10) {
+export function rollout(env, model1, model2, startState, horizon = 30) {
   return rolloutDetailed(env, model1, model2, startState, horizon).traj;
 }
 
-export function rolloutDetailed(env, model1, model2, startState, horizon = 10) {
+export function rolloutDetailed(env, model1, model2, startState, horizon = 30) {
   const traj = [startState.slice()];
   const steps = [];
   let state = startState.slice();

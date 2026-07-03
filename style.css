@@ -8,7 +8,7 @@
 
   --p1: #a93226;
   --p2: #2471a3;
-  --dog: #2e7d32;
+  --dog: #008000;
   --link: #2c5282;
 
   --font-serif: "Georgia", "Times New Roman", Times, serif;
@@ -163,8 +163,14 @@ strong {
 }
 
 .agent-p1,
-.agent-p2 {
+.agent-p2,
+.agent-dog {
   font-weight: 600;
+}
+
+.agent-dog,
+.sub-dog {
+  color: var(--dog);
 }
 
 #doggame .agent-dog {
@@ -315,6 +321,13 @@ th {
   color: var(--muted);
   font-style: italic;
   text-align: left;
+}
+
+.game-demo-link {
+  margin: 1.5rem 0;
+  font-size: 1.25rem;
+  font-style: italic;
+  text-align: center;
 }
 
 .game-block p:last-child {
