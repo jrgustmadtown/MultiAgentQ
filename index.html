@@ -41,7 +41,7 @@
       </section>
 
       <section id="cargames">
-        <h2>Car Game · <a href="three_viz/car/zerosum.html"><em>Visualization</em></a></h2>
+        <h2>Car Game</h2>
         <p>
           The car game is a discrete grid environment. Two cars occupy separate cells on an
           <em>n</em>×<em>n</em> board. The state records both positions:
@@ -130,12 +130,13 @@
                 </div>
                 <figcaption>
                   P1 starts at (0, 2) and P2 starts at (1, 3)
-                  <br> P2 chasing P1 is visible before converging towards center squares
                 </figcaption>
               </figure>
             </div>
           </div>
         </div>
+
+        <p class="game-demo-link"><a href="three_viz/car/zerosum.html"><em>Zero Sum Car Game Demonstrator &amp; Commentary</em></a></p>
 
         <div class="game-block" id="car-gensum">
           <h3>General-Sum Car Game</h3>
@@ -218,7 +219,7 @@
       </section>
 
       <section id="doggame">
-        <h2>Dog Game · <a href="three_viz/dog/replay.html"><em>Visualization</em></a></h2>
+        <h2>Dog Game</h2>
         <p>
           The dog game is a continuous game played on the unit square [0, 1]². Each player
           controls a position in the plane. The state is all four coordinates. Each step both
@@ -245,7 +246,7 @@
                 4 → 256 → 256 → 289 (17×17 joint actions). Outputs reshape to
                 <span class="agent-p1">Q₁</span>(<em>s</em>, <em>a</em><sub class="sub-p1">1</sub>, <em>a</em><sub class="sub-p2">2</sub>) and
                 <span class="agent-p2">Q₂</span>(<em>s</em>, <em>a</em><sub class="sub-p1">1</sub>, <em>a</em><sub class="sub-p2">2</sub>).
-                States are sampled randomly during planning, with mild boundary bias.
+                States are sampled uniformly at random during planning.
               </p>
               <p>
                 Each iteration draws a random state. For all 289 joint actions, the environment
@@ -277,24 +278,18 @@
               <figure>
                 <div class="figure-frame">
                   <img
-                    src="doggame/rollout_1.png"
+                    src="doggame/rollout_5.png"
                     alt="Competitive dog game rollout showing players and dog midpoint"
                   >
                 </div>
-                <figcaption>
-                  Players failed to converge directly towards their corners
-                </figcaption>
               </figure>
               <figure>
                 <div class="figure-frame">
                   <img
-                    src="doggame/rollout_2.png"
+                    src="doggame/rollout_3.png"
                     alt="Second competitive dog game rollout"
                   >
                 </div>
-                <figcaption>
-                  Both players converged towards the corners, inhabiting their nash equilibria state
-                </figcaption>
               </figure>
             </div>
           </div>
@@ -314,6 +309,8 @@
             </figure>
           </div>
         </div>
+
+        <p class="game-demo-link"><a href="three_viz/dog/doggame.html"><em>Dog Game Demonstrator &amp; Commentary</em></a></p>
 
       </section>
 

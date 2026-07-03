@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Zero-Sum Car Game — Replay</title>
+    <title>Zero-Sum Car Game</title>
     <link rel="stylesheet" href="../../style.css">
     <link rel="stylesheet" href="../viz.css">
     <script type="importmap">
@@ -31,8 +31,8 @@
         <p>
           <span class="agent-p1">Red</span> = Player 1,
               <span class="agent-p2">Blue</span> = Player 2 ·
-              Arrows show the planned trajectory ·
-          Step through or play a rollout from trained weights.
+              Arrows show the planned trajectory 
+          
         </p>
 
         <div class="viz-layout">
@@ -49,6 +49,10 @@
               <button id="btn-forward" class="viz-btn" type="button">Forward →</button>
             </div>
             <button id="btn-random" class="viz-btn" type="button">New random start</button>
+            <label class="viz-toggle" for="show-cell-values">
+              <input id="show-cell-values" type="checkbox">
+              Show cell values
+            </label>
             <form id="start-form" class="viz-start-form">
               <div class="viz-start-label">Start position</div>
               <div class="viz-start-row">
@@ -75,6 +79,40 @@
             <div id="stats" class="viz-stats">Loading weights…</div>
             <div id="error" class="viz-error"></div>
           </div>
+        </div>
+
+        <div class="viz-commentary">
+          <h3>Commentary</h3>
+          <p>
+            Because we are only looking at a 5×5 grid here, we can reasonably view the entire
+            state space and notice patterns.
+          </p>
+          <p>
+            When the players start at positions with odd Manhattan-distance parity, the cars tend
+            to move toward the center and dance around the central squares until the game ends,
+            letting each player get the most points out of their turns. Cars often take a slightly
+            suboptimal path to the center, as in
+            <span class="viz-inline-start">
+              <span class="agent-p1">P1</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>3<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>4)</span>
+              <span class="viz-coord-sep">·</span>
+              <span class="agent-p2">P2</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0)</span>
+            </span>,
+            but the general strategy is still clear.
+          </p>
+          <p>
+            When the players start at positions with a even Manhattan-distance parity, the behavior is more
+            elaborate. The optimal center dance is not possible with even parity, and
+            <span class="agent-p2">Player 2</span> has the advantage, with an incentive to crash.
+            <span class="agent-p1">Player 1</span> stalls once by walking into a wall while
+            <span class="agent-p2">Player 2</span> chases, which shifts the distance parity to odd.
+            After that, both players move toward the center as expected. Stalling at a wall
+            carries a significant penalty of −0.556, equal in magnitude to the reward for landing on
+            the center square. It also means spending more time in the low scoring squares near
+            the walls. With the number of turns allowed, though, this lets
+            <span class="agent-p2">Player 1</span> share the center square and make up for the loss.
+          </p>
         </div>
       </section>
 
@@ -108,6 +146,7 @@
       const p2yEl = document.getElementById("p2-y");
       const startErrorEl = document.getElementById("start-error");
       const startInputs = [p1xEl, p1yEl, p2xEl, p2yEl];
+      const showCellValuesEl = document.getElementById("show-cell-values");
 
       let renderer = null;
       let model = null;
@@ -373,6 +412,9 @@
           showStartError(err.message);
         }
       });
+      showCellValuesEl.addEventListener("change", () => {
+        renderer?.setShowGridRewards(showCellValuesEl.checked);
+      });
 
       async function init() {
         setButtonsEnabled(false);
@@ -385,6 +427,7 @@
           if (startIdx < 0) startIdx = 0;
 
           renderer = new CarReplayRenderer(canvasWrap, GRID_SIZE);
+          renderer.setGridRewards(env.gridReward);
           model = await loadWeights(WEIGHTS_URL);
           errorEl.textContent = "";
           runRollout(starts[startIdx]);

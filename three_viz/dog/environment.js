@@ -7,6 +7,7 @@ const ANGLES_DEG = [
 
 export const NUM_ACTIONS = 17;
 export const STEP_SIZE = 0.1;
+export const DEFAULT_HORIZON = 30;
 export const DEFAULT_HOUSE1 = [0.25, 0.25];
 export const DEFAULT_HOUSE2 = [0.75, 0.75];
 
@@ -76,17 +77,7 @@ export function createDogEnv(options = {}) {
     },
 
     sampleState() {
-      const uniform = () => Math.random();
-      const biasedCoord = () => {
-        const a = 0.3 + Math.random() * 1.7;
-        const b = Math.random() < 0.5 ? 0.3 : 2.0;
-        const x = Math.random();
-        return Math.pow(x, a) / (Math.pow(x, a) + Math.pow(1 - x, b));
-      };
-      if (Math.random() < 0.5) {
-        return [uniform(), uniform(), uniform(), uniform()];
-      }
-      return [biasedCoord(), biasedCoord(), biasedCoord(), biasedCoord()];
+      return [Math.random(), Math.random(), Math.random(), Math.random()];
     },
   };
 }
