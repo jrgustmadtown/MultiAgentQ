@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Q-Network Forward Pass Test</title>
     <style>
-      body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
-      pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
+      body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+      pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; white-space: pre-wrap; }
       .ok { color: #0a7; }
       .err { color: #c33; }
     </style>
@@ -14,49 +14,78 @@
   <body>
     <h1>Q-Network Forward Pass Test</h1>
     <p>
-      Serve the repo root so <code>fetch</code> can load JSON, e.g.
+      Serve the repo root, e.g.
       <code>python3 -m http.server 8000</code> then open
       <code>http://localhost:8000/three_viz/test_forward.html</code>.
     </p>
     <div id="out">Loading…</div>
     <script type="module">
       import { loadWeights, qValues } from "./qnetwork.js";
-
-      const tests = [
-        {
-          name: "cargame_zerosum player 1",
-          url: "../cargame_zerosum/weights_player1.json",
-          state: [0, 0, 4, 4],
-          gridSize: 5,
-        },
-        {
-          name: "doggame player 1",
-          url: "../doggame/weights_player1.json",
-          state: [0.25, 0.25, 0.75, 0.75],
-        },
-      ];
+      import { createDogEnv } from "./dog/environment.js";
+      import { actionsForState, rolloutDetailed } from "./dog/policy.js";
+      import { ACTION_NAMES } from "./dog/environment.js";
 
       const out = document.getElementById("out");
 
+      async function testForward(name, url, state, gridSize) {
+        const model = await loadWeights(url);
+        const q = qValues(model, state, { gridSize });
+        const max = Math.max(...q);
+        const argmax = q.indexOf(max);
+        return (
+          `${name}\n` +
+          `  format: ${model.format}\n` +
+          `  outputs: ${q.length}\n` +
+          `  max Q: ${max.toFixed(6)} at index ${argmax}\n` +
+          `  first 5 Q: [${q.slice(0, 5).map((v) => v.toFixed(4)).join(", ")}]`
+        );
+      }
+
       try {
-        const results = [];
-        for (const test of tests) {
-          const model = await loadWeights(test.url);
-          const q = qValues(model, test.state, { gridSize: test.gridSize });
-          const max = Math.max(...q);
-          const argmax = q.indexOf(max);
-          results.push(
-            `${test.name}\n` +
-              `  format: ${model.format}\n` +
-              `  state: [${test.state.join(", ")}]\n` +
-              `  outputs: ${q.length}\n` +
-              `  max Q: ${max.toFixed(6)} at index ${argmax}\n` +
-              `  first 5 Q: [${q.slice(0, 5).map((v) => v.toFixed(4)).join(", ")}]`
-          );
-        }
-        out.innerHTML = `<pre class="ok">${results.join("\n\n")}</pre>`;
+        const lines = [];
+
+        lines.push("=== Forward pass ===");
+        lines.push(await testForward(
+          "cargame_zerosum player 1",
+          "../cargame_zerosum/weights_player1.json",
+          [0, 0, 4, 4],
+          5,
+        ));
+        lines.push(await testForward(
+          "doggame player 1",
+          "../doggame/weights_player1.json",
+          [0.25, 0.25, 0.75, 0.75],
+        ));
+        lines.push(await testForward(
+          "doggame player 2",
+          "../doggame/weights_player2.json",
+          [0.25, 0.25, 0.75, 0.75],
+        ));
+
+        lines.push("\n=== Dog game policy + rollout ===");
+        const model1 = await loadWeights("../doggame/weights_player1.json");
+        const model2 = await loadWeights("../doggame/weights_player2.json");
+        const env = createDogEnv();
+        const start = [0.25, 0.25, 0.75, 0.75];
+        const [a1, a2] = actionsForState(model1, model2, start);
+        lines.push(`start: [${start.join(", ")}]`);
+        lines.push(`actions: P1=${a1} (${ACTION_NAMES[a1]}), P2=${a2} (${ACTION_NAMES[a2]})`);
+
+        const { traj, steps } = rolloutDetailed(env, model1, model2, start, 10);
+        lines.push(`rollout length: ${traj.length} states, ${steps.length} steps`);
+        const last = steps[steps.length - 1];
+        lines.push(
+          `final dog: (${((last.to[0] + last.to[2]) / 2).toFixed(3)}, ` +
+          `${((last.to[1] + last.to[3]) / 2).toFixed(3)})`,
+        );
+        lines.push(
+          `cumulative r1: ${last.cumulativeR1.toFixed(4)}, ` +
+          `r2: ${last.cumulativeR2.toFixed(4)}`,
+        );
+
+        out.innerHTML = `<pre class="ok">${lines.join("\n\n")}</pre>`;
       } catch (err) {
-        out.innerHTML = `<pre class="err">${err.message}</pre>`;
+        out.innerHTML = `<pre class="err">${err.message}\n\n${err.stack ?? ""}</pre>`;
       }
     </script>
   </body>

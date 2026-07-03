@@ -3,17 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Competitive Dog Game — Replay</title>
+    <title>Dog Game — Replay</title>
     <link rel="stylesheet" href="../../style.css">
     <link rel="stylesheet" href="../viz.css">
-    <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-      }
-    }
-    </script>
   </head>
   <body>
     <main class="page page--viz">
@@ -27,45 +19,42 @@
       </ul>
 
       <section class="viz-section game-block" id="dog-competitive-replay">
-        <h2>Competitive Dog Game</h2>
+        <h2>Dog Game</h2>
         <p>
           <span class="agent-p1">Red</span> = Player 1,
-          <span class="agent-p2">Blue</span> = Player 2 ·
-          Arrows show the planned trajectory ·
-          Step through or play a rollout from trained weights.
+          <span class="agent-p2">Blue</span> = Player 2,
+          <span class="agent-dog">dog</span> at their midpoint ·
+          Interactive visualization coming next — this page verifies JSON weights and rollout.
         </p>
 
         <div class="viz-layout">
           <figure class="viz-figure">
             <div class="figure-frame">
-              <div id="canvas-wrap"></div>
+              <div id="canvas-wrap" class="viz-placeholder">
+                <p>Three.js replay<br>coming next</p>
+              </div>
             </div>
           </figure>
 
           <div class="viz-controls">
-            <button id="btn-play" class="viz-btn" type="button">Play rollout</button>
-            <div class="viz-btn-row">
-              <button id="btn-back" class="viz-btn" type="button">← Back</button>
-              <button id="btn-forward" class="viz-btn" type="button">Forward →</button>
-            </div>
             <button id="btn-random" class="viz-btn" type="button">New random start</button>
             <form id="start-form" class="viz-start-form">
-              <div class="viz-start-label">Start position</div>
+              <div class="viz-start-label">Start position (unit square)</div>
               <div class="viz-start-row">
                 <label class="viz-start-field">
                   <span class="viz-start-agent agent-p1">P1</span>
                   <span class="viz-coord-pair">
-                    (<span class="viz-coord-axis">x</span><input id="p1-x" type="number" min="0" max="4" value="0" aria-label="P1 x">
+                    (<span class="viz-coord-axis">x</span><input id="p1-x" type="number" min="0" max="1" step="0.01" value="0.25" aria-label="P1 x">
                     <span class="viz-coord-sep">,</span>
-                    <span class="viz-coord-axis">y</span><input id="p1-y" type="number" min="0" max="4" value="0" aria-label="P1 y">)
+                    <span class="viz-coord-axis">y</span><input id="p1-y" type="number" min="0" max="1" step="0.01" value="0.25" aria-label="P1 y">)
                   </span>
                 </label>
                 <label class="viz-start-field">
                   <span class="viz-start-agent agent-p2">P2</span>
                   <span class="viz-coord-pair">
-                    (<span class="viz-coord-axis">x</span><input id="p2-x" type="number" min="0" max="4" value="4" aria-label="P2 x">
+                    (<span class="viz-coord-axis">x</span><input id="p2-x" type="number" min="0" max="1" step="0.01" value="0.75" aria-label="P2 x">
                     <span class="viz-coord-sep">,</span>
-                    <span class="viz-coord-axis">y</span><input id="p2-y" type="number" min="0" max="4" value="4" aria-label="P2 y">)
+                    <span class="viz-coord-axis">y</span><input id="p2-y" type="number" min="0" max="1" step="0.01" value="0.75" aria-label="P2 y">)
                   </span>
                 </label>
               </div>
@@ -84,22 +73,16 @@
     </main>
 
     <script type="module">
-      // Placeholder: reuses car replay modules until dog viz is wired up.
       import { loadWeights } from "../qnetwork.js";
-      import { createCarEnv } from "../car/environment.js";
-      import { rolloutDetailed } from "../car/policy.js";
-      import { CarReplayRenderer } from "../car/renderer.js";
+      import { createDogEnv, dogPosition, ACTION_NAMES } from "./environment.js";
+      import { rolloutDetailed } from "./policy.js";
 
-      const GRID_SIZE = 5;
-      const HORIZON = 20;
-      const WEIGHTS_URL = "../../cargame_zerosum/weights_player1.json";
+      const HORIZON = 10;
+      const WEIGHTS_P1 = "../../doggame/weights_player1.json";
+      const WEIGHTS_P2 = "../../doggame/weights_player2.json";
 
       const statsEl = document.getElementById("stats");
       const errorEl = document.getElementById("error");
-      const canvasWrap = document.getElementById("canvas-wrap");
-      const btnPlay = document.getElementById("btn-play");
-      const btnBack = document.getElementById("btn-back");
-      const btnForward = document.getElementById("btn-forward");
       const btnRandom = document.getElementById("btn-random");
       const startForm = document.getElementById("start-form");
       const btnSetStart = document.getElementById("btn-set-start");
@@ -110,168 +93,13 @@
       const startErrorEl = document.getElementById("start-error");
       const startInputs = [p1xEl, p1yEl, p2xEl, p2yEl];
 
-      let renderer = null;
-      let model = null;
-      let currentRollout = { traj: [], steps: [] };
-      let currentInfo = null;
-      let currentStep = 0;
+      let model1 = null;
+      let model2 = null;
       let env = null;
-      let starts = [];
-      let startIdx = 0;
-
-      function setButtonsEnabled(enabled) {
-        btnPlay.disabled = !enabled;
-        btnRandom.disabled = !enabled;
-        btnSetStart.disabled = !enabled;
-        p1xEl.disabled = !enabled;
-        p1yEl.disabled = !enabled;
-        p2xEl.disabled = !enabled;
-        p2yEl.disabled = !enabled;
-        if (enabled) {
-          updateStepButtons();
-        } else {
-          btnBack.disabled = true;
-          btnForward.disabled = true;
-        }
-      }
-
-      function updateStepButtons() {
-        const maxStep = currentRollout.traj.length - 1;
-        btnBack.disabled = currentStep <= 0;
-        btnForward.disabled = currentStep >= maxStep;
-      }
-
-      function nextArrowIndex(step) {
-        const maxStep = currentRollout.traj.length - 1;
-        if (step <= 0 || step >= maxStep) {
-          return null;
-        }
-        return step;
-      }
-
-      async function goToStep(step, { animate = false } = {}) {
-        if (!currentRollout.traj.length) return;
-        renderer.stopPlayback();
-        const maxStep = currentRollout.traj.length - 1;
-        const target = Math.max(0, Math.min(step, maxStep));
-
-        if (target === currentStep) {
-          renderer.setActiveStep(nextArrowIndex(currentStep));
-          updateStepButtons();
-          return;
-        }
-
-        const from = currentRollout.traj[currentStep];
-        const to = currentRollout.traj[target];
-        const isSingleStep = Math.abs(target - currentStep) === 1;
-
-        if (animate && isSingleStep) {
-          setButtonsEnabled(false);
-          const arrowIndex = target > currentStep ? currentStep : target;
-          try {
-            await renderer.animateStep(from, to, arrowIndex, 450);
-          } finally {
-            currentStep = target;
-            renderer.setActiveStep(nextArrowIndex(currentStep));
-            if (currentInfo) {
-              updateStats(currentInfo, currentStep);
-            }
-            setButtonsEnabled(true);
-          }
-          return;
-        }
-
-        currentStep = target;
-        renderer.setCars(to);
-        renderer.setActiveStep(nextArrowIndex(currentStep));
-        if (currentInfo) {
-          updateStats(currentInfo, currentStep);
-        }
-        updateStepButtons();
-      }
-
-      function stepForward() {
-        goToStep(currentStep + 1, { animate: true }).catch((err) => {
-          errorEl.textContent = err.message;
-          setButtonsEnabled(true);
-        });
-      }
-
-      function stepBack() {
-        goToStep(currentStep - 1, { animate: true }).catch((err) => {
-          errorEl.textContent = err.message;
-          setButtonsEnabled(true);
-        });
-      }
+      let currentRollout = { traj: [], steps: [] };
 
       function fmt(n) {
         return n.toFixed(3);
-      }
-
-      function scoreAtState(state) {
-        return {
-          p1Grid: env.cellGridReward(state[0], state[1]),
-          p1Dist: env.manhattanToCenter(state[0], state[1]),
-        };
-      }
-
-      function summarize(traj, startState) {
-        const moves = traj.length - 1;
-        let p1Moves = 0;
-        let p2Moves = 0;
-        for (let i = 0; i < traj.length - 1; i++) {
-          const s = traj[i];
-          const sn = traj[i + 1];
-          if (s[0] !== sn[0] || s[1] !== sn[1]) p1Moves++;
-          if (s[2] !== sn[2] || s[3] !== sn[3]) p2Moves++;
-        }
-        const crashed = env.isCollision(traj[traj.length - 1]);
-        return {
-          startState,
-          moves,
-          p1Moves,
-          p2Moves,
-          unique: new Set(traj.map((s) => s.join(","))).size,
-          crashed,
-        };
-      }
-
-      function updateStats(info, step = 0) {
-        const s = info.startState;
-        const state = currentRollout.traj[step] ?? currentRollout.traj[0];
-        const scores = scoreAtState(state);
-        const stepInfo = step > 0 ? currentRollout.steps[step - 1] : null;
-        const lastReward = stepInfo ? stepInfo.reward : null;
-        const cumulative = stepInfo ? stepInfo.cumulativeReward : 0;
-        const breakdown = stepInfo
-          ? env.rewardBreakdown(stepInfo.from, stepInfo.a1, stepInfo.a2)
-          : null;
-
-        statsEl.innerHTML = `
-          <div><strong>Start:</strong>
-            <span class="agent-p1">P1</span> (${s[0]},${s[1]}) ·
-            <span class="agent-p2">P2</span> (${s[2]},${s[3]})
-          </div>
-          <div><strong>Step:</strong> ${step} / ${info.moves}</div>
-          <hr class="stats-rule">
-          <div><strong>Cell values (position only)</strong></div>
-          <div><span class="agent-p1">P1 cell value:</span> ${fmt(scores.p1Grid)}
-            <span class="muted">(dist ${scores.p1Dist})</span></div>
-          <div><strong>Step reward (shared scalar):</strong> ${lastReward === null ? "—" : fmt(lastReward)}</div>
-          ${breakdown && !breakdown.crashed ? `
-          <div class="stats-note">
-            = P1 landing cell (${fmt(breakdown.p1LandingGrid)})
-            + living (${fmt(breakdown.livingCost)})
-            ${breakdown.p1Stay ? `+ P1 stay (${fmt(breakdown.p1Stay)})` : ""}
-            ${breakdown.p2Stay ? `+ P2 stay (${fmt(breakdown.p2Stay)})` : ""}
-          </div>` : ""}
-          ${breakdown?.crashed ? `<div class="stats-note">Crash penalty</div>` : ""}
-          <div><strong>Cumulative (P1 ↑ / P2 ↓):</strong> ${fmt(cumulative)}</div>
-          <hr class="stats-rule">
-          <div><strong>Total moves:</strong> ${info.moves}</div>
-          <div><strong>Unique states:</strong> ${info.unique}</div>
-          <div><strong>Ended in crash:</strong> ${info.crashed ? "yes" : "no"}</div>
-        `;
       }
 
       function clearStartError() {
@@ -308,60 +136,54 @@
           Number(p2xEl.value),
           Number(p2yEl.value),
         ];
-        const max = GRID_SIZE - 1;
-        if (coords.some((n) => !Number.isInteger(n) || n < 0 || n > max)) {
-          throw new Error(`Coordinates must be integers from 0 to ${max}.`);
-        }
-        if (coords[0] === coords[2] && coords[1] === coords[3]) {
-          throw new Error("Players cannot start in the same cell.");
+        if (coords.some((n) => Number.isNaN(n) || n < 0 || n > 1)) {
+          throw new Error("Coordinates must be numbers from 0 to 1.");
         }
         return coords;
       }
 
+      function updateStats() {
+        const { traj, steps } = currentRollout;
+        const start = traj[0];
+        const end = traj[traj.length - 1];
+        const dog0 = dogPosition(start);
+        const dogEnd = dogPosition(end);
+        const last = steps[steps.length - 1];
+
+        statsEl.innerHTML = `
+          <div><strong>Weights:</strong> loaded (289 outputs each)</div>
+          <div><strong>Start:</strong>
+            <span class="agent-p1">P1</span> (${fmt(start[0])},${fmt(start[1])}) ·
+            <span class="agent-p2">P2</span> (${fmt(start[2])},${fmt(start[3])})
+          </div>
+          <div><strong>Dog start:</strong> (${fmt(dog0[0])}, ${fmt(dog0[1])})</div>
+          <hr class="stats-rule">
+          <div><strong>Rollout:</strong> ${steps.length} steps (horizon ${HORIZON})</div>
+          <div><strong>End:</strong>
+            <span class="agent-p1">P1</span> (${fmt(end[0])},${fmt(end[1])}) ·
+            <span class="agent-p2">P2</span> (${fmt(end[2])},${fmt(end[3])})
+          </div>
+          <div><strong>Dog end:</strong> (${fmt(dogEnd[0])}, ${fmt(dogEnd[1])})</div>
+          ${last ? `
+          <div><strong>Last actions:</strong>
+            <span class="agent-p1">P1</span> ${ACTION_NAMES[last.a1]} ·
+            <span class="agent-p2">P2</span> ${ACTION_NAMES[last.a2]}
+          </div>
+          <div><strong>Cumulative r₁:</strong> ${fmt(last.cumulativeR1)}</div>
+          <div><strong>Cumulative r₂:</strong> ${fmt(last.cumulativeR2)}</div>` : ""}
+        `;
+      }
+
       function runRollout(startState) {
-        renderer?.stopPlayback();
         clearStartError();
-        currentRollout = rolloutDetailed(env, model, startState, HORIZON);
-        currentInfo = summarize(currentRollout.traj, startState);
-        currentStep = 0;
+        currentRollout = rolloutDetailed(env, model1, model2, startState, HORIZON);
         syncStartInputs(startState);
-        updateStats(currentInfo, 0);
-        renderer.setCars(startState);
-        renderer.drawTrail(currentRollout.traj, null);
-        updateStepButtons();
-        return currentInfo;
+        updateStats();
       }
 
-      async function play() {
-        if (!currentRollout.traj.length) return;
-        renderer.stopPlayback();
-        setButtonsEnabled(false);
-        currentStep = 0;
-        const info = currentInfo ?? summarize(currentRollout.traj, currentRollout.traj[0]);
-        try {
-          await renderer.playTrajectory(currentRollout.traj, 450, (step) => {
-            currentStep = step;
-            updateStats(info, step);
-            updateStepButtons();
-          });
-        } finally {
-          renderer.setActiveStep(nextArrowIndex(currentStep));
-          setButtonsEnabled(true);
-        }
-      }
-
-      btnPlay.addEventListener("click", () => {
-        play().catch((err) => {
-          errorEl.textContent = err.message;
-          setButtonsEnabled(true);
-        });
-      });
-      btnBack.addEventListener("click", stepBack);
-      btnForward.addEventListener("click", stepForward);
       btnRandom.addEventListener("click", () => {
-        startIdx = Math.floor(Math.random() * starts.length);
         errorEl.textContent = "";
-        runRollout(starts[startIdx]);
+        runRollout(env.sampleState());
       });
       startForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -373,24 +195,22 @@
       });
 
       async function init() {
-        setButtonsEnabled(false);
+        btnRandom.disabled = true;
+        btnSetStart.disabled = true;
         try {
-          env = createCarEnv(GRID_SIZE);
-          starts = env.allValidStartStates();
-          startIdx = starts.findIndex(
-            (s) => s[0] === 0 && s[1] === 0 && s[2] === 4 && s[3] === 4,
-          );
-          if (startIdx < 0) startIdx = 0;
-
-          renderer = new CarReplayRenderer(canvasWrap, GRID_SIZE);
-          model = await loadWeights(WEIGHTS_URL);
+          env = createDogEnv();
+          [model1, model2] = await Promise.all([
+            loadWeights(WEIGHTS_P1),
+            loadWeights(WEIGHTS_P2),
+          ]);
           errorEl.textContent = "";
-          runRollout(starts[startIdx]);
-          setButtonsEnabled(true);
+          runRollout([0.25, 0.25, 0.75, 0.75]);
+          btnRandom.disabled = false;
+          btnSetStart.disabled = false;
         } catch (err) {
           console.error(err);
           errorEl.textContent = err.message;
-          statsEl.textContent = "Failed to initialize. Check the browser console.";
+          statsEl.textContent = "Failed to load weights. Run weight_to_json.py on doggame .txt files.";
         }
       }
 
