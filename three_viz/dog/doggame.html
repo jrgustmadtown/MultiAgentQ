@@ -32,13 +32,21 @@
           <span class="agent-p1">Red</span> = Player 1,
           <span class="agent-p2">Blue</span> = Player 2,
           <span class="agent-dog">Green</span> = dog at their midpoint ·
-          diamonds = houses
+          diamonds = tents
         </p>
+
+        <div class="viz-view-options">
+          <label class="viz-view-toggle" for="view-pixel">
+            <input id="view-pixel" type="checkbox">
+            <span>Pixel art view</span>
+          </label>
+        </div>
 
         <div class="viz-layout">
           <figure class="viz-figure">
             <div class="figure-frame">
-              <div id="canvas-wrap"></div>
+              <div id="canvas-wrap" class="viz-view-panel"></div>
+              <div id="canvas-wrap-pixel" class="viz-view-panel viz-view-panel--pixel" hidden></div>
             </div>
           </figure>
 
@@ -50,7 +58,7 @@
             <button id="btn-random" class="viz-btn" type="button">New random start</button>
             <form id="start-form" class="viz-start-form viz-start-form--continuous" novalidate>
               <div class="viz-start-label">Start position (unit square)</div>
-              <p class="viz-placement-hint">
+              <p class="viz-placement-hint" id="placement-hint">
                 Drag <span class="agent-p1">P1</span> or <span class="agent-p2">P2</span> on the grid,
                 then click <strong>Set start</strong>.
               </p>
@@ -58,17 +66,17 @@
                 <label class="viz-start-field">
                   <span class="viz-start-agent agent-p1">P1</span>
                   <span class="viz-coord-pair">
-                    (<span class="viz-coord-axis">x</span><input id="p1-x" type="number" min="0" max="1" step="any" value="0.25" aria-label="P1 x">
+                    (<span class="viz-coord-axis">x</span><input id="p1-x" type="number" min="0" max="1" step="any" value="0.90" aria-label="P1 x">
                     <span class="viz-coord-sep">,</span>
-                    <span class="viz-coord-axis">y</span><input id="p1-y" type="number" min="0" max="1" step="any" value="0.25" aria-label="P1 y">)
+                    <span class="viz-coord-axis">y</span><input id="p1-y" type="number" min="0" max="1" step="any" value="0.10" aria-label="P1 y">)
                   </span>
                 </label>
                 <label class="viz-start-field">
                   <span class="viz-start-agent agent-p2">P2</span>
                   <span class="viz-coord-pair">
-                    (<span class="viz-coord-axis">x</span><input id="p2-x" type="number" min="0" max="1" step="any" value="0.75" aria-label="P2 x">
+                    (<span class="viz-coord-axis">x</span><input id="p2-x" type="number" min="0" max="1" step="any" value="0.25" aria-label="P2 x">
                     <span class="viz-coord-sep">,</span>
-                    <span class="viz-coord-axis">y</span><input id="p2-y" type="number" min="0" max="1" step="any" value="0.75" aria-label="P2 y">)
+                    <span class="viz-coord-axis">y</span><input id="p2-y" type="number" min="0" max="1" step="any" value="0.10" aria-label="P2 y">)
                   </span>
                 </label>
               </div>
@@ -88,9 +96,10 @@
 
     <script type="module">
       import { loadWeights } from "../qnetwork.js";
-      import { createDogEnv, dogPosition, ACTION_NAMES, DEFAULT_HORIZON } from "./environment.js";
+      import { createDogEnv, dogPosition, ACTION_NAMES, DEFAULT_HORIZON, PLAYER_RADIUS, clampPosition } from "./environment.js";
       import { rolloutDetailed } from "./policy.js";
       import { DogReplayRenderer } from "./renderer.js";
+      import { DogPixelRenderer } from "./renderer-pixel.js?v=8";
 
       const HORIZON = DEFAULT_HORIZON;
       const WEIGHTS_P1 = "../../doggame/weights_player1.json";
@@ -99,6 +108,9 @@
       const statsEl = document.getElementById("stats");
       const errorEl = document.getElementById("error");
       const canvasWrap = document.getElementById("canvas-wrap");
+      const canvasWrapPixel = document.getElementById("canvas-wrap-pixel");
+      const viewPixelToggle = document.getElementById("view-pixel");
+      const placementHintEl = document.getElementById("placement-hint");
       const btnPlay = document.getElementById("btn-play");
       const btnStop = document.getElementById("btn-stop");
       const btnRandom = document.getElementById("btn-random");
@@ -110,26 +122,30 @@
       const p2yEl = document.getElementById("p2-y");
       const startErrorEl = document.getElementById("start-error");
       const startInputs = [p1xEl, p1yEl, p2xEl, p2yEl];
+      const coordMin = PLAYER_RADIUS;
+      const coordMax = 1 - PLAYER_RADIUS;
+      for (const el of startInputs) {
+        el.min = coordMin;
+        el.max = coordMax;
+      }
 
       function roundCoord(n) {
         return Math.round(n * 1000) / 1000;
       }
 
       function readInputState() {
-        return [
-          Number(p1xEl.value),
-          Number(p1yEl.value),
-          Number(p2xEl.value),
-          Number(p2yEl.value),
-        ];
+        const [x1, y1] = clampPosition(Number(p1xEl.value), Number(p1yEl.value));
+        const [x2, y2] = clampPosition(Number(p2xEl.value), Number(p2yEl.value));
+        return [x1, y1, x2, y2];
       }
 
       function previewActorsFromInputs() {
         const coords = readInputState();
-        if (coords.some((n) => Number.isNaN(n) || n < 0 || n > 1)) {
+        if (coords.some((n) => Number.isNaN(n))) {
           return;
         }
         renderer?.setActors(coords);
+        rendererPixel?.setActors(coords);
       }
 
       let dragPlayer = null;
@@ -152,8 +168,27 @@
         setPlayerCoords(dragPlayer, x, y);
       }
 
+      function isPixelView() {
+        return viewPixelToggle.checked;
+      }
+
+      function setViewMode(usePixel) {
+        canvasWrap.hidden = usePixel;
+        canvasWrapPixel.hidden = !usePixel;
+        if (usePixel) {
+          canvasWrap.classList.remove("canvas--draggable");
+          placementHintEl.textContent = "Switch to grid view to drag players on the square.";
+          requestAnimationFrame(() => rendererPixel?.resize());
+        } else {
+          canvasWrap.classList.add("canvas--draggable");
+          placementHintEl.innerHTML =
+            'Drag <span class="agent-p1">P1</span> or <span class="agent-p2">P2</span> on the grid, then click <strong>Set start</strong>.';
+          requestAnimationFrame(() => renderer?.resize());
+        }
+      }
+
       function onPointerDown(event) {
-        if (!renderer || isPlaying || event.button !== 0) {
+        if (!renderer || isPlaying || event.button !== 0 || isPixelView()) {
           return;
         }
         const picked = renderer.pickPlayerFromPointer(event);
@@ -193,6 +228,7 @@
       }
 
       let renderer = null;
+      let rendererPixel = null;
       let model1 = null;
       let model2 = null;
       let currentRollout = { traj: [], steps: [] };
@@ -213,6 +249,7 @@
 
       function stopPlayback() {
         renderer?.stopPlayback();
+        rendererPixel?.stopPlayback();
         setButtonsEnabled(true, { playing: false });
         if (currentInfo) {
           updateStats(currentInfo, currentStep);
@@ -296,14 +333,15 @@
 
       function parseStartState() {
         const coords = readInputState().map(roundCoord);
-        if (coords.some((n) => Number.isNaN(n) || n < 0 || n > 1)) {
-          throw new Error("Coordinates must be numbers from 0 to 1.");
+        if (coords.some((n) => Number.isNaN(n) || n < coordMin || n > coordMax)) {
+          throw new Error(`Coordinates must be between ${coordMin} and ${coordMax}.`);
         }
         return coords;
       }
 
       function runRollout(startState) {
         renderer?.stopPlayback();
+        rendererPixel?.stopPlayback();
         clearStartError();
         currentRollout = rolloutDetailed(env, model1, model2, startState, HORIZON);
         currentInfo = summarize(currentRollout.traj, startState);
@@ -312,6 +350,8 @@
         updateStats(currentInfo, 0);
         renderer.setActors(startState);
         renderer.drawTrail(currentRollout.traj, null);
+        rendererPixel?.setActors(startState);
+        rendererPixel?.drawTrail(currentRollout.traj);
         return currentInfo;
       }
 
@@ -321,10 +361,15 @@
         currentStep = 0;
         const info = currentInfo ?? summarize(currentRollout.traj, currentRollout.traj[0]);
         try {
-          await renderer.playTrajectory(currentRollout.traj, 500, (step) => {
-            currentStep = step;
-            updateStats(info, step);
-          });
+          await Promise.all([
+            renderer.playTrajectory(currentRollout.traj, 500, (step) => {
+              currentStep = step;
+              updateStats(info, step);
+            }),
+            ...(rendererPixel
+              ? [rendererPixel.playTrajectory(currentRollout.traj, 500)]
+              : []),
+          ]);
         } finally {
           currentStep = currentRollout.traj.length - 1;
           updateStats(info, currentStep);
@@ -357,6 +402,10 @@
         });
       }
 
+      viewPixelToggle.addEventListener("change", () => {
+        setViewMode(isPixelView());
+      });
+
       async function init() {
         setButtonsEnabled(false);
         try {
@@ -365,6 +414,11 @@
             house1: env.house1,
             house2: env.house2,
           });
+          rendererPixel = new DogPixelRenderer(canvasWrapPixel, {
+            house1: env.house1,
+            house2: env.house2,
+          });
+          await rendererPixel.ready;
           canvasWrap.classList.add("canvas--draggable");
           const canvas = renderer.domElement;
           canvas.addEventListener("pointerdown", onPointerDown);
@@ -373,7 +427,7 @@
             loadWeights(WEIGHTS_P2),
           ]);
           errorEl.textContent = "";
-          runRollout([0.25, 0.25, 0.75, 0.75]);
+          runRollout([0.90, 0.10, 0.25, 0.10]);
           setButtonsEnabled(true);
         } catch (err) {
           console.error(err);
