@@ -86,7 +86,8 @@ figure.viz-figure {
   position: relative;
 }
 
-#canvas-wrap {
+#canvas-wrap,
+#canvas-wrap-3d {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -95,7 +96,8 @@ figure.viz-figure {
   container-type: inline-size;
 }
 
-#canvas-wrap canvas {
+#canvas-wrap canvas,
+#canvas-wrap-3d canvas {
   position: absolute;
   inset: 0;
   display: block;
@@ -113,13 +115,21 @@ figure.viz-figure {
 .grid-reward-label {
   position: absolute;
   left: calc((var(--cell-x) / var(--grid-n)) * 100% + 3px);
-  top: calc(((var(--cell-y) + 1) / var(--grid-n)) * 100%);
+  top: calc(((var(--grid-n) - var(--cell-y)) / var(--grid-n)) * 100%);
   transform: translateY(calc(-100% - 2px));
   font-family: var(--font-serif);
   font-size: clamp(0.5rem, 2.4cqw, 0.7rem);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--muted);
+}
+
+.grid-reward-labels--3d .grid-reward-label {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  font-size: clamp(0.48rem, 1.8cqw, 0.65rem);
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
 }
 
 .viz-toggle {
@@ -259,16 +269,20 @@ figure.viz-figure {
   color: var(--muted);
 }
 
-#canvas-wrap.canvas--draggable {
+#canvas-wrap.canvas--draggable,
+#canvas-wrap-pixel.canvas--draggable {
   cursor: default;
 }
 
-#canvas-wrap.canvas--draggable canvas {
+#canvas-wrap.canvas--draggable canvas,
+#canvas-wrap-pixel.canvas--draggable canvas {
   cursor: default;
 }
 
 #canvas-wrap.canvas--dragging,
-#canvas-wrap.canvas--dragging canvas {
+#canvas-wrap.canvas--dragging canvas,
+#canvas-wrap-pixel.canvas--dragging,
+#canvas-wrap-pixel.canvas--dragging canvas {
   cursor: grabbing;
 }
 
@@ -390,7 +404,7 @@ figure.viz-figure {
   display: block;
   width: 10.5rem;
   height: auto;
-  background: var(--bg, #faf8f2);
+  background: var(--bg, #f3f1f6);
   grid-row: 1;
   grid-column: 1;
 }
