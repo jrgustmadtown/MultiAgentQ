@@ -239,18 +239,30 @@ const P1_SIGN_ACCENT = "#902838";
 const P2_SIGN = "#48b0d0";
 const P2_SIGN_ACCENT = "#d040a0";
 
-function drawThinSign(set, board, accent) {
+const SIGN_TEX_W = 14;
+const SIGN_TEX_H = 13;
+
+function drawGameSign(set, board, accent) {
   const post = "#503828";
-  for (let y = 0; y <= 4; y++) {
-    set(2, y, board);
-    set(3, y, board);
+  const left = 1;
+  const right = SIGN_TEX_W - 2;
+  for (let x = left; x <= right; x++) {
+    set(x, 0, OUTLINE);
   }
-  set(2, 1, accent);
-  set(3, 1, accent);
-  set(2, 3, accent);
-  set(3, 3, accent);
-  for (let y = 5; y <= 10; y++) {
-    set(3, y, post);
+  for (let y = 1; y <= 5; y++) {
+    for (let x = left; x <= right; x++) {
+      set(x, y, board);
+    }
+  }
+  for (let x = left + 1; x < right; x += 2) {
+    set(x, 2, accent);
+    set(x, 4, accent);
+  }
+  const postL = Math.floor(SIGN_TEX_W / 2) - 1;
+  const postR = postL + 1;
+  for (let y = 6; y < SIGN_TEX_H; y++) {
+    set(postL, y, post);
+    set(postR, y, post);
   }
 }
 
@@ -448,14 +460,14 @@ export class DogPixelRenderer {
       verticalIdleOnly: true,
     });
     this.marker1 = makeFlatSprite(
-      makeOutlinedTexture(6, 11, (set) => drawThinSign(set, P1_SIGN, P1_SIGN_ACCENT)),
-      0.028,
-      0.052,
+      makeOutlinedTexture(SIGN_TEX_W, SIGN_TEX_H, (set) => drawGameSign(set, P1_SIGN, P1_SIGN_ACCENT)),
+      0.064,
+      0.060,
     );
     this.marker2 = makeFlatSprite(
-      makeOutlinedTexture(6, 11, (set) => drawThinSign(set, P2_SIGN, P2_SIGN_ACCENT)),
-      0.028,
-      0.052,
+      makeOutlinedTexture(SIGN_TEX_W, SIGN_TEX_H, (set) => drawGameSign(set, P2_SIGN, P2_SIGN_ACCENT)),
+      0.064,
+      0.060,
     );
 
     for (const actor of [this.player1, this.player2, this.dog, this.marker1, this.marker2]) {
