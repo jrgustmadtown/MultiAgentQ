@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { dogPosition, DEFAULT_HOUSE1, DEFAULT_HOUSE2 } from "./environment.js";
+import { dogPosition, DEFAULT_HOUSE1, DEFAULT_HOUSE2, clampPosition } from "./environment.js";
 
 const ARENA = 1;
 const VIEW_PADDING = 1.12;
@@ -95,6 +95,27 @@ function movementDirection(from, to) {
   return dz <= 0 ? "up" : "down";
 }
 
+/** Walk facing for sprites that use side-walk frames on vertical movement (Temmie). */
+function spriteWalkDirection(from, to, mesh) {
+  const state = mesh.userData.spriteState;
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  if (Math.hypot(dx, dz) < 1e-6) {
+    return "down";
+  }
+  const primary = movementDirection(from, to);
+  if (state?.verticalWalkAsSide && (primary === "up" || primary === "down")) {
+    if (Math.abs(dx) >= 1e-8) {
+      state.lastSideFacing = dx >= 0 ? "right" : "left";
+    }
+    return state.lastSideFacing ?? "left";
+  }
+  if (primary === "left" || primary === "right") {
+    state.lastSideFacing = primary;
+  }
+  return primary;
+}
+
 function walkFrameIndex(anims, direction, frameIndex, walking) {
   const frames = anims[direction];
   if (!walking) {
@@ -112,14 +133,9 @@ function applySpriteFrame(mesh, direction, frameIndex, walking) {
   if (!state) {
     return;
   }
-  const { anims, maxW, maxH, texelScale, verticalIdleOnly } = state;
-  let dir = direction;
-  let isWalking = walking;
-  // Temmie hive walk (up/down) is the bouncy pink shop animation — keep idle instead.
-  if (verticalIdleOnly && (direction === "up" || direction === "down")) {
-    dir = "down";
-    isWalking = false;
-  }
+  const { anims, maxW, maxH, texelScale } = state;
+  const dir = direction;
+  const isWalking = walking;
   const frames = anims[dir] ?? anims.down;
   const idx = walkFrameIndex(anims, dir, frameIndex, isWalking);
   const key = `${dir}:${idx}`;
@@ -149,7 +165,8 @@ function makeAnimatedSprite(anims, maxW, maxH, texelScale, options = {}) {
     maxH,
     texelScale,
     key: "",
-    verticalIdleOnly: options.verticalIdleOnly ?? false,
+    verticalWalkAsSide: options.verticalWalkAsSide ?? false,
+    lastSideFacing: null,
   };
   mesh.scale.set(1, 1, 1);
   return mesh;
@@ -457,8 +474,18 @@ export class DogPixelRenderer {
     this.player1 = makeAnimatedSprite(friskP1, ...FRISK_MAX, SPRITE_TEXEL_SCALE);
     this.player2 = makeAnimatedSprite(friskP2, ...FRISK_MAX, SPRITE_TEXEL_SCALE);
     this.dog = makeAnimatedSprite(temmieAnims, ...TEMMIE_MAX, SPRITE_TEXEL_SCALE, {
-      verticalIdleOnly: true,
+      verticalWalkAsSide: true,
     });
+    const hitGeo = new THREE.BoxGeometry(0.06, 0.06, 0.06);
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.hit1 = new THREE.Mesh(hitGeo, hitMat);
+    this.hit2 = new THREE.Mesh(hitGeo, hitMat.clone());
+    this.hit1.userData.playerId = 1;
+    this.hit2.userData.playerId = 2;
     this.marker1 = makeFlatSprite(
       makeOutlinedTexture(SIGN_TEX_W, SIGN_TEX_H, (set) => drawGameSign(set, P1_SIGN, P1_SIGN_ACCENT)),
       0.064,
@@ -470,11 +497,20 @@ export class DogPixelRenderer {
       0.060,
     );
 
-    for (const actor of [this.player1, this.player2, this.dog, this.marker1, this.marker2]) {
-      actor.position.y = 0.03;
-      actor.renderOrder = 10;
+    for (const actor of [this.hit1, this.hit2, this.player1, this.player2, this.dog, this.marker1, this.marker2]) {
+      if (actor !== this.hit1 && actor !== this.hit2) {
+        actor.position.y = 0.03;
+        actor.renderOrder = 10;
+      } else if (actor === this.hit1 || actor === this.hit2) {
+        actor.position.y = 0.04;
+      }
       this.scene.add(actor);
     }
+
+    this._raycaster = new THREE.Raycaster();
+    this._pointerNdc = new THREE.Vector2();
+    this._dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    this._planeHit = new THREE.Vector3();
 
     setSpriteIdle(this.player1);
     setSpriteIdle(this.player2);
@@ -509,9 +545,40 @@ export class DogPixelRenderer {
     this.player1.position.set(p1.x, 0.03, p1.z);
     this.player2.position.set(p2.x, 0.03, p2.z);
     this.dog.position.set(dog.x, 0.03, dog.z);
+    this.hit1.position.set(p1.x, 0.04, p1.z);
+    this.hit2.position.set(p2.x, 0.04, p2.z);
     setSpriteIdle(this.player1);
     setSpriteIdle(this.player2);
     setSpriteIdle(this.dog);
+  }
+
+  /** Move players only (leave dog at current position until start is committed). */
+  setPlayers(state) {
+    const p1 = worldPos(state[0], state[1]);
+    const p2 = worldPos(state[2], state[3]);
+    this._snapActor(p1);
+    this._snapActor(p2);
+    this.player1.position.set(p1.x, 0.03, p1.z);
+    this.player2.position.set(p2.x, 0.03, p2.z);
+    this.hit1.position.set(p1.x, 0.04, p1.z);
+    this.hit2.position.set(p2.x, 0.04, p2.z);
+    setSpriteIdle(this.player1);
+    setSpriteIdle(this.player2);
+  }
+
+  _syncHitTargets() {
+    this.hit1.position.set(this.player1.position.x, 0.04, this.player1.position.z);
+    this.hit2.position.set(this.player2.position.x, 0.04, this.player2.position.z);
+  }
+
+  syncDragTargets() {
+    this._syncHitTargets();
+  }
+
+  getPlayerState() {
+    const [x1, y1] = clampPosition(this.player1.position.x, 1 - this.player1.position.z);
+    const [x2, y2] = clampPosition(this.player2.position.x, 1 - this.player2.position.z);
+    return [x1, y1, x2, y2];
   }
 
   clearTrail() {
@@ -576,7 +643,7 @@ export class DogPixelRenderer {
 
     const p1Dir = movementDirection(start.p1, end.p1);
     const p2Dir = movementDirection(start.p2, end.p2);
-    const dogDir = movementDirection(start.dog, end.dog);
+    const dogDir = spriteWalkDirection(start.dog, end.dog, this.dog);
     const p1Walk = Math.hypot(end.p1.x - start.p1.x, end.p1.z - start.p1.z) > 1e-6;
     const p2Walk = Math.hypot(end.p2.x - start.p2.x, end.p2.z - start.p2.z) > 1e-6;
     const dogWalk = Math.hypot(end.dog.x - start.dog.x, end.dog.z - start.dog.z) > 1e-6;
@@ -607,6 +674,7 @@ export class DogPixelRenderer {
         this.player1.position.y = 0.03;
         this.player2.position.y = 0.03;
         this.dog.position.y = 0.03;
+        this._syncHitTargets();
 
         const friskFrame = Math.floor((now - t0) / FRISK_FRAME_MS);
         const temmieFrame = Math.floor((now - t0) / TEMMIE_FRAME_MS);
@@ -643,6 +711,38 @@ export class DogPixelRenderer {
     if (token === this.playToken) {
       this.setActors(traj[traj.length - 1]);
     }
+  }
+
+  get domElement() {
+    return this.renderer.domElement;
+  }
+
+  /** Map a pointer event on the canvas to state coordinates in [0, 1]². */
+  pickStateFromPointer(event) {
+    this._setPointerNdc(event);
+    this._raycaster.setFromCamera(this._pointerNdc, this.camera);
+    if (!this._raycaster.ray.intersectPlane(this._dragPlane, this._planeHit)) {
+      return [0, 0];
+    }
+    return clampPosition(this._planeHit.x, 1 - this._planeHit.z);
+  }
+
+  _setPointerNdc(event) {
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    this._pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this._pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  /** Return 1 or 2 if pointer hits a player drag target; otherwise null. */
+  pickPlayerFromPointer(event) {
+    this._setPointerNdc(event);
+    this._raycaster.setFromCamera(this._pointerNdc, this.camera);
+    const hits = this._raycaster.intersectObjects([this.hit1, this.hit2], false);
+    if (!hits.length) {
+      return null;
+    }
+    return hits[0].object.userData.playerId;
   }
 
   _updateCamera(aspect) {

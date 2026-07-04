@@ -35,10 +35,18 @@
           
         </p>
 
+        <div class="viz-view-options">
+          <label class="viz-view-toggle" for="view-3d">
+            <input id="view-3d" type="checkbox">
+            <span><span class="agent-p1">Standard MR</span> vs. <span class="agent-p2">Streamliner</span></span>
+          </label>
+        </div>
+
         <div class="viz-layout">
           <figure class="viz-figure">
             <div class="figure-frame">
-              <div id="canvas-wrap"></div>
+              <div id="canvas-wrap" class="viz-view-panel"></div>
+              <div id="canvas-wrap-3d" class="viz-view-panel viz-view-panel--3d" hidden></div>
             </div>
           </figure>
 
@@ -94,10 +102,10 @@
             suboptimal path to the center, as in
             <span class="viz-inline-start">
               <span class="agent-p1">P1</span>
-              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>3<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>4)</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0)</span>
               <span class="viz-coord-sep">·</span>
               <span class="agent-p2">P2</span>
-              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0)</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>1<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>2)</span>
             </span>,
             but the general strategy is still clear.
           </p>
@@ -126,14 +134,18 @@
       import { createCarEnv } from "./environment.js";
       import { rolloutDetailed } from "./policy.js";
       import { CarReplayRenderer } from "./renderer.js";
+      import { Car3DReplayRenderer } from "./renderer-3d.js?v=14";
 
       const GRID_SIZE = 5;
+      const STEP_MS = 495;
       const HORIZON = 20;
       const WEIGHTS_URL = "../../cargame_zerosum/weights_player1.json";
 
       const statsEl = document.getElementById("stats");
       const errorEl = document.getElementById("error");
       const canvasWrap = document.getElementById("canvas-wrap");
+      const canvasWrap3d = document.getElementById("canvas-wrap-3d");
+      const view3dToggle = document.getElementById("view-3d");
       const btnPlay = document.getElementById("btn-play");
       const btnBack = document.getElementById("btn-back");
       const btnForward = document.getElementById("btn-forward");
@@ -148,7 +160,8 @@
       const startInputs = [p1xEl, p1yEl, p2xEl, p2yEl];
       const showCellValuesEl = document.getElementById("show-cell-values");
 
-      let renderer = null;
+      let renderer2d = null;
+      let renderer3d = null;
       let model = null;
       let currentRollout = { traj: [], steps: [] };
       let currentInfo = null;
@@ -179,6 +192,56 @@
         btnForward.disabled = currentStep >= maxStep;
       }
 
+      function is3DView() {
+        return view3dToggle.checked;
+      }
+
+      function activeRenderer() {
+        return is3DView() ? renderer3d : renderer2d;
+      }
+
+      function setViewMode(use3d) {
+        canvasWrap.hidden = use3d;
+        canvasWrap3d.hidden = !use3d;
+        if (use3d) {
+          requestAnimationFrame(() => renderer3d?.resize());
+        } else {
+          requestAnimationFrame(() => renderer2d?.resize());
+        }
+        if (showCellValuesEl.checked) {
+          setShowGridRewardsOnAll(true);
+        }
+      }
+
+      function stopAllPlayback() {
+        renderer2d?.stopPlayback();
+        renderer3d?.stopPlayback();
+      }
+
+      function setCarsOnAll(state, traj = null, stepIndex = 0) {
+        renderer2d?.setCars(state);
+        renderer3d?.setCars(state);
+        if (traj && traj.length > 1) {
+          renderer3d?.setCarHeadingsForStep(traj, stepIndex);
+        }
+      }
+
+      function drawTrailOnAll(traj, activeStep = null) {
+        renderer2d?.drawTrail(traj, activeStep);
+        renderer3d?.drawTrail(traj, activeStep);
+      }
+
+      function setActiveStepOnAll(stepIndex) {
+        renderer2d?.setActiveStep(stepIndex);
+        renderer3d?.setActiveStep(stepIndex);
+      }
+
+      function setShowGridRewardsOnAll(show) {
+        const use3d = is3DView();
+        renderer2d?.setShowGridRewards(show && !use3d);
+        renderer3d?.setShowGridRewards(show && use3d);
+      }
+
       function nextArrowIndex(step) {
         const maxStep = currentRollout.traj.length - 1;
         if (step <= 0 || step >= maxStep) {
@@ -189,12 +252,12 @@
 
       async function goToStep(step, { animate = false } = {}) {
         if (!currentRollout.traj.length) return;
-        renderer.stopPlayback();
+        stopAllPlayback();
         const maxStep = currentRollout.traj.length - 1;
         const target = Math.max(0, Math.min(step, maxStep));
 
         if (target === currentStep) {
-          renderer.setActiveStep(nextArrowIndex(currentStep));
+          setActiveStepOnAll(nextArrowIndex(currentStep));
           updateStepButtons();
           return;
         }
@@ -206,11 +269,16 @@
         if (animate && isSingleStep) {
           setButtonsEnabled(false);
           const arrowIndex = target > currentStep ? currentStep : target;
+          const next = target > currentStep ? (currentRollout.traj[target + 1] ?? null) : null;
           try {
-            await renderer.animateStep(from, to, arrowIndex, 450);
+            await Promise.all([
+              renderer2d.animateStep(from, to, arrowIndex, STEP_MS),
+              renderer3d.animateStep(from, to, arrowIndex, STEP_MS, next),
+            ]);
           } finally {
             currentStep = target;
-            renderer.setActiveStep(nextArrowIndex(currentStep));
+            setActiveStepOnAll(nextArrowIndex(currentStep));
+            renderer3d?.setCarHeadingsForStep(currentRollout.traj, target);
             if (currentInfo) {
               updateStats(currentInfo, currentStep);
             }
@@ -220,8 +288,8 @@
         }
 
         currentStep = target;
-        renderer.setCars(to);
-        renderer.setActiveStep(nextArrowIndex(currentStep));
+        setCarsOnAll(to, currentRollout.traj, target);
+        setActiveStepOnAll(nextArrowIndex(currentStep));
         if (currentInfo) {
           updateStats(currentInfo, currentStep);
         }
@@ -360,33 +428,36 @@
       }
 
       function runRollout(startState) {
-        renderer?.stopPlayback();
+        stopAllPlayback();
         clearStartError();
         currentRollout = rolloutDetailed(env, model, startState, HORIZON);
         currentInfo = summarize(currentRollout.traj, startState);
         currentStep = 0;
         syncStartInputs(startState);
         updateStats(currentInfo, 0);
-        renderer.setCars(startState);
-        renderer.drawTrail(currentRollout.traj, null);
+        setCarsOnAll(startState, currentRollout.traj, 0);
+        drawTrailOnAll(currentRollout.traj, null);
         updateStepButtons();
         return currentInfo;
       }
 
       async function play() {
         if (!currentRollout.traj.length) return;
-        renderer.stopPlayback();
         setButtonsEnabled(false);
         currentStep = 0;
         const info = currentInfo ?? summarize(currentRollout.traj, currentRollout.traj[0]);
         try {
-          await renderer.playTrajectory(currentRollout.traj, 450, (step) => {
-            currentStep = step;
-            updateStats(info, step);
-            updateStepButtons();
-          });
+          await Promise.all([
+            renderer2d.playTrajectory(currentRollout.traj, STEP_MS, (step) => {
+              currentStep = step;
+              updateStats(info, step);
+              updateStepButtons();
+            }),
+            renderer3d.playTrajectory(currentRollout.traj, STEP_MS),
+          ]);
         } finally {
-          renderer.setActiveStep(nextArrowIndex(currentStep));
+          setActiveStepOnAll(nextArrowIndex(currentStep));
+          renderer3d?.setCarHeadingsForStep(currentRollout.traj, currentStep);
           setButtonsEnabled(true);
         }
       }
@@ -413,10 +484,16 @@
         }
       });
       showCellValuesEl.addEventListener("change", () => {
-        renderer?.setShowGridRewards(showCellValuesEl.checked);
+        setShowGridRewardsOnAll(showCellValuesEl.checked);
+      });
+
+      view3dToggle.addEventListener("change", () => {
+        setViewMode(is3DView());
       });
 
       async function init() {
+        view3dToggle.checked = false;
+        setViewMode(false);
         setButtonsEnabled(false);
         try {
           env = createCarEnv(GRID_SIZE);
@@ -426,8 +503,11 @@
           );
           if (startIdx < 0) startIdx = 0;
 
-          renderer = new CarReplayRenderer(canvasWrap, GRID_SIZE);
-          renderer.setGridRewards(env.gridReward);
+          renderer2d = new CarReplayRenderer(canvasWrap, GRID_SIZE);
+          renderer3d = new Car3DReplayRenderer(canvasWrap3d, GRID_SIZE);
+          await renderer3d.ready;
+          renderer2d.setGridRewards(env.gridReward);
+          renderer3d.setGridRewards(env.gridReward);
           model = await loadWeights(WEIGHTS_URL);
           errorEl.textContent = "";
           runRollout(starts[startIdx]);

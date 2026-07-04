@@ -20,8 +20,9 @@ const HEAD_LENGTH = 0.14;
 const HEAD_WIDTH = 0.08;
 const OFFSET = 0.12;
 
-function cellCenter(x, y) {
-  return new THREE.Vector3(x + 0.5, 0, y + 0.5);
+function cellCenter(x, y, gridSize) {
+  // Mirror X so grid coords match matplotlib (Three.js lookAt with up=+Z flips world X).
+  return new THREE.Vector3(gridSize - x - 0.5, 0, y + 0.5);
 }
 
 export class CarReplayRenderer {
@@ -43,7 +44,7 @@ export class CarReplayRenderer {
 
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
     this.camera.position.set(this.gridCenter, 10, this.gridCenter);
-    this.camera.up.set(0, 0, -1);
+    this.camera.up.set(0, 0, 1);
     this.camera.lookAt(this.gridCenter, 0, this.gridCenter);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -84,8 +85,9 @@ export class CarReplayRenderer {
     const borderMat = new THREE.LineBasicMaterial({ color: GRID_BORDER });
 
     for (let i = 0; i <= this.gridSize; i++) {
-      const a = new THREE.Vector3(i, 0.01, 0);
-      const b = new THREE.Vector3(i, 0.01, this.gridSize);
+      const xi = this.gridSize - i;
+      const a = new THREE.Vector3(xi, 0.01, 0);
+      const b = new THREE.Vector3(xi, 0.01, this.gridSize);
       const c = new THREE.Vector3(0, 0.01, i);
       const d = new THREE.Vector3(this.gridSize, 0.01, i);
       const mat = i === 0 || i === this.gridSize ? borderMat : lineMat;
@@ -140,8 +142,9 @@ export class CarReplayRenderer {
   }
 
   _carPositions(state) {
-    const p1 = cellCenter(state[0], state[1]).add(new THREE.Vector3(OFFSET, 0.1, OFFSET));
-    const p2 = cellCenter(state[2], state[3]).add(new THREE.Vector3(-OFFSET, 0.1, -OFFSET));
+    const n = this.gridSize;
+    const p1 = cellCenter(state[0], state[1], n).add(new THREE.Vector3(OFFSET, 0.1, OFFSET));
+    const p2 = cellCenter(state[2], state[3], n).add(new THREE.Vector3(-OFFSET, 0.1, -OFFSET));
     return { p1, p2 };
   }
 
@@ -178,15 +181,16 @@ export class CarReplayRenderer {
     for (let i = 0; i < total; i++) {
       const s = traj[i];
       const sn = traj[i + 1];
+      const n = this.gridSize;
       const p1 = this._addArrow(
-        cellCenter(s[0], s[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
-        cellCenter(sn[0], sn[1]).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
+        cellCenter(s[0], s[1], n).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
+        cellCenter(sn[0], sn[1], n).add(new THREE.Vector3(OFFSET, 0.05, OFFSET)),
         P1_TRAIL,
         TRAIL_OPACITY,
       );
       const p2 = this._addArrow(
-        cellCenter(s[2], s[3]).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
-        cellCenter(sn[2], sn[3]).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
+        cellCenter(s[2], s[3], n).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
+        cellCenter(sn[2], sn[3], n).add(new THREE.Vector3(-OFFSET, 0.05, -OFFSET)),
         P2_TRAIL,
         TRAIL_OPACITY,
       );
@@ -330,13 +334,13 @@ export class CarReplayRenderer {
   }
 
   /** Animate one step between two states (used by forward/back controls). */
-  async animateStep(fromState, toState, stepIndex, stepMs = 450) {
+  async animateStep(fromState, toState, stepIndex, stepMs = 495) {
     this.stopPlayback();
     this.setActiveStep(stepIndex);
     await this._animateSegment(fromState, toState, stepMs);
   }
 
-  async playTrajectory(traj, stepMs = 450, onStep) {
+  async playTrajectory(traj, stepMs = 495, onStep) {
     this.stopPlayback();
     const token = this.playToken;
     this.drawTrail(traj, null);
