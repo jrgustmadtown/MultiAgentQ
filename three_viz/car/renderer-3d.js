@@ -4,8 +4,6 @@ import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 
 // Match style.css agent colors and paper palette.
-const P1_COLOR = 0xa93226;
-const P2_COLOR = 0x2471a3;
 const P1_TRAIL = 0xc0392b;
 const P2_TRAIL = 0x5dade2;
 const P1_ACTIVE = 0xff2d2d;

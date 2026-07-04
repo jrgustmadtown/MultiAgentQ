@@ -196,10 +196,6 @@
         return view3dToggle.checked;
       }
 
-      function activeRenderer() {
-        return is3DView() ? renderer3d : renderer2d;
-      }
-
       function setViewMode(use3d) {
         canvasWrap.hidden = use3d;
         canvasWrap3d.hidden = !use3d;
