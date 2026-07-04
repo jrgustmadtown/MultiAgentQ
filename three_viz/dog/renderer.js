@@ -187,6 +187,31 @@ export class DogReplayRenderer {
     this.dog.position.copy(dog);
   }
 
+  /** Move players only (leave dog at current position until start is committed). */
+  setPlayers(state) {
+    const p1 = worldPos(state[0], state[1]);
+    const p2 = worldPos(state[2], state[3]);
+    this.player1.position.copy(p1);
+    this.player2.position.copy(p2);
+    this.hit1.position.copy(p1);
+    this.hit2.position.copy(p2);
+  }
+
+  _syncHitTargets() {
+    this.hit1.position.copy(this.player1.position);
+    this.hit2.position.copy(this.player2.position);
+  }
+
+  syncDragTargets() {
+    this._syncHitTargets();
+  }
+
+  getPlayerState() {
+    const [x1, y1] = clampPosition(this.player1.position.x, 1 - this.player1.position.z);
+    const [x2, y2] = clampPosition(this.player2.position.x, 1 - this.player2.position.z);
+    return [x1, y1, x2, y2];
+  }
+
   clearTrail() {
     this.trailSteps = [];
     while (this.trailGroup.children.length) {
@@ -362,6 +387,7 @@ export class DogReplayRenderer {
         this.player1.position.lerpVectors(start.p1, end.p1, t);
         this.player2.position.lerpVectors(start.p2, end.p2, t);
         this.dog.position.lerpVectors(start.dog, end.dog, t);
+        this._syncHitTargets();
         if (t < 1) {
           requestAnimationFrame(tick);
         } else {

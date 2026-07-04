@@ -1,5 +1,6 @@
 :root {
-  --bg: #faf8f2;
+  --bg: #f3f1f6;
+  --inset: #e8e6ef;
   --surface: #ffffff;
   --text: #1c1c1c;
   --muted: #555555;
@@ -266,7 +267,7 @@ pre {
   font-size: 0.82rem;
   line-height: 1.5;
   text-align: left;
-  background: #f4f2ec;
+  background: var(--inset);
   border: 1px solid var(--rule);
 }
 
@@ -278,7 +279,7 @@ code {
 p code,
 li code {
   padding: 0.05em 0.25em;
-  background: #f4f2ec;
+  background: var(--inset);
 }
 
 /* --- Tables --- */
