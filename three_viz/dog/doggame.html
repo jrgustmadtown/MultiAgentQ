@@ -30,15 +30,14 @@
         <h2>Dog Game</h2>
         <p>
           <span class="agent-p1">Red</span> = Player 1,
-          <span class="agent-p2">Blue</span> = Player 2,
-          <span class="agent-dog">Green</span> = dog at their midpoint ·
-          diamonds = tents
+          <span class="agent-p2">Blue</span> = Player 2 ·
+          Colored designators = Houses
         </p>
 
         <div class="viz-view-options">
           <label class="viz-view-toggle" for="view-pixel">
             <input id="view-pixel" type="checkbox">
-            <span>Pixel art view</span>
+            <span>Temmie Game</span>
           </label>
         </div>
 
@@ -86,6 +85,98 @@
             <div id="stats" class="viz-stats">Loading weights…</div>
             <div id="error" class="viz-error"></div>
           </div>
+        </div>
+
+        <div class="viz-commentary">
+          <h3>Commentary</h3>
+          <p>
+            The version of the dog game that was the focus of my study is one of three. In this case, positions of the dog houses share no 
+            coordinate points and are equidistant from the center in opposite directions. The nash equilibrium state for each player is the corner
+            closest to their respective house, resulting in a tie. This version was chosen for closer evaluation of Nash-Q as having a single nash equilibrium allows for more focus.
+            <br>
+            The optimal path the players should take to get to the nash equilibrium state is not known (atleast at the moment), so we can view the estimations from Nash-Q.
+            From the results that can be viewed in the demonstration, players will not simply move in the shortest possible path to the NE state and will instead
+            react to the current state. That includes making gradual turns and opting towards the edges. Given the reward structure that considers
+            the distance from the dog to the house at every step, this makes sense as a way to increase rewards at the beginning of the game.
+          </p>
+          <p>
+            Another version is when the house are equidistant from the center but both reside on a horizontal or vertical line. In that there are infinitely many
+            nash equilibrium states, as players can reside on any point on the edge perpendicular to the line the houses share that is closest to their own house. 
+            This results in a tie.
+          </p>
+          <figure class="viz-house-diagram" aria-label="Horizontal house layout with P1 at (0.375, 0.5) and P2 at (0.625, 0.5)">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img">
+              <title>P1 and P2 houses on a horizontal line through the center</title>
+              <defs>
+                <pattern id="house-stripe-gray" patternUnits="userSpaceOnUse" width="1.25" height="8">
+                  <rect width="1.25" height="4" fill="#c8c4bc"/>
+                  <rect y="4" width="1.25" height="4" fill="#c8c4bc" opacity="0.35"/>
+                </pattern>
+                <pattern id="house-stripe-p1" patternUnits="userSpaceOnUse" width="1.25" height="8">
+                  <rect width="1.25" height="4" fill="#a93226"/>
+                  <rect y="4" width="1.25" height="4" fill="#a93226" opacity="0.35"/>
+                </pattern>
+                <pattern id="house-stripe-p2" patternUnits="userSpaceOnUse" width="1.25" height="8">
+                  <rect width="1.25" height="4" fill="#2471a3"/>
+                  <rect y="4" width="1.25" height="4" fill="#2471a3" opacity="0.35"/>
+                </pattern>
+              </defs>
+              <rect x="4" y="4" width="92" height="92" fill="#faf8f2" stroke="var(--border, #ccc)" stroke-width="1.5"/>
+              <line x1="4" y1="50" x2="96" y2="50" stroke="#d8d4cc" stroke-width="1"/>
+              <rect x="49.375" y="4" width="1.25" height="92" fill="url(#house-stripe-gray)"/>
+              <rect x="7.375" y="4" width="1.25" height="92" fill="url(#house-stripe-p1)"/>
+              <rect x="91.375" y="4" width="1.25" height="92" fill="url(#house-stripe-p2)"/>
+              <polygon points="37.5,46 41.5,50 37.5,54 33.5,50" fill="#a93226"/>
+              <polygon points="62.5,46 66.5,50 62.5,54 58.5,50" fill="#2471a3"/>
+              <circle cx="50" cy="50" r="1.75" fill="#2d8a2d"/>
+            </svg>
+            <figcaption>
+              <span class="agent-p1">P1 House</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.375<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
+              <span class="agent-p2">P2 House</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.625<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
+              <p>Dashed lines represent the lines at which all points are nash equilibria.</p>
+            </figcaption>
+          </figure>
+          <p>
+            The third version is when the houses are not equidistant from the center. The player with the house closer
+            to the center is able to position themselves such that dog remains closer to their own house than the other player's by residing
+            an area determined by the distance between the houses. That player wins.
+          </p>
+          <figure class="viz-house-diagram" aria-label="Diagonal house layout with P1 at (0.25, 0.25) and P2 at (0.50, 0.50)">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img">
+              <title>P1 house near the corner and P2 house at the center</title>
+              <defs>
+                <pattern id="p2-ne-stripe" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                  <rect width="8" height="4" fill="#2471a3"/>
+                  <rect y="4" width="8" height="4" fill="#2471a3" opacity="0.35"/>
+                </pattern>
+              </defs>
+              <g transform="translate(0, 100) scale(1, -1)">
+                <rect x="4" y="4" width="92" height="92" fill="#faf8f2" stroke="var(--border, #ccc)" stroke-width="1.5"/>
+                <polygon points="50,96 96,96 96,50" fill="#2471a3" opacity="0.18"/>
+                <line x1="4" y1="50" x2="96" y2="50" stroke="#d8d4cc" stroke-width="1"/>
+                <line x1="50" y1="4" x2="50" y2="96" stroke="#d8d4cc" stroke-width="1"/>
+                <line x1="27" y1="27" x2="73" y2="73" stroke="#d8d4cc" stroke-width="1.25"/>
+                <line x1="37.44" y1="39.56" x2="39.56" y2="37.44" stroke="#d8d4cc" stroke-width="1"/>
+                <line x1="48.94" y1="51.06" x2="51.06" y2="48.94" stroke="#d8d4cc" stroke-width="1"/>
+                <line x1="60.44" y1="62.56" x2="62.56" y2="60.44" stroke="#d8d4cc" stroke-width="1"/>
+                <polygon points="49.56,95.56 95.56,49.56 96.44,50.44 50.44,96.44" fill="url(#p2-ne-stripe)"/>
+                <polygon points="27,23 31,27 27,31 23,27" fill="#a93226"/>
+                <polygon points="50,46 54,50 50,54 46,50" fill="#2471a3"/>
+              </g>
+            </svg>
+            <figcaption>
+              <span class="agent-p1">P1 House</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.25<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.25)</span>
+              <span class="agent-p2">P2 House</span>
+              <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.50<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
+              <p>Area marked by the dashed line represents the nash equilibria for P2. The line is perpendicular
+                to the line the houses lie on at a distance from the house closer to the center at a distance equal to that house's 
+                distance to the other house.
+              </p>
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -407,6 +498,8 @@
       });
 
       async function init() {
+        viewPixelToggle.checked = false;
+        setViewMode(false);
         setButtonsEnabled(false);
         try {
           env = createDogEnv();
