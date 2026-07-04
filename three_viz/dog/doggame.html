@@ -91,17 +91,17 @@
           <h3>Commentary</h3>
           <p>
             The version of the dog game that was the focus of my study is one of three. In this case, positions of the dog houses share no 
-            coordinate points and are equidistant from the center in opposite directions. The nash equilibrium state for each player is the corner
-            closest to their respective house, resulting in a tie. This version was chosen for closer evaluation of Nash-Q as having a single nash equilibrium allows makes verification easier.
+            coordinate points and are equidistant from the center in opposite directions. The Nash equilibrium state for each player is the corner
+            closest to their respective house, resulting in a tie. This version was chosen for closer evaluation of Nash-Q as having a single Nash equilibrium allows makes verification easier.
             <br>
-            The optimal path the players should take to get to the nash equilibrium state is not known (atleast at the moment), so we can view the estimations from Nash-Q.
+            The optimal path the players should take to get to the Nash equilibrium state is not known (atleast at the moment), so we can view the estimations from Nash-Q.
             From the results that can be viewed in the demonstration, players will not simply move in the shortest possible path to the NE state and will instead
             react to the current state. That includes making gradual turns and opting towards the edges. Given the reward structure that considers
             the distance from the dog to the house at every step, this makes sense as a way to increase rewards at the beginning of the game.
           </p>
           <p>
             Another version is when the houses are equidistant from the center but both reside on a horizontal or vertical line. In that case there are infinitely many
-            nash equilibrium states, as players can reside on any point on the edge of the grid perpendicular to the line the houses share that is closest to their own house. 
+            Nash equilibrium states, as players can reside on any point on the edge of the grid perpendicular to the line the houses share that is closest to their own house. 
             This results in a tie.
           </p>
           <figure class="viz-house-diagram" aria-label="Horizontal house layout with P1 at (0.375, 0.5) and P2 at (0.625, 0.5)">
@@ -135,13 +135,13 @@
               <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.375<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
               <span class="agent-p2">P2 House</span>
               <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.625<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
-              <p>Dashed lines represent the lines at which all points are nash equilibria.</p>
+              <p>Dashed lines represent the lines at which all points are Nash equilibria.</p>
             </figcaption>
           </figure>
           <p>
             The third version is when the houses are not equidistant from the center. The player with the house closer
             to the center is able to position themselves such that dog remains closer to their own house than the other player's by residing
-            in an area determined by the distance between the houses. That player wins and has infinte nash equilibria positions.
+            in an area determined by the distance between the houses. That player wins and has infinte Nash equilibria positions.
           </p>
           <figure class="viz-house-diagram" aria-label="Diagonal house layout with P1 at (0.25, 0.25) and P2 at (0.50, 0.50)">
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img">
@@ -171,7 +171,7 @@
               <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.25<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.25)</span>
               <span class="agent-p2">P2 House</span>
               <span class="viz-coord-pair">(<span class="viz-coord-axis">x</span>0.50<span class="viz-coord-sep">,</span> <span class="viz-coord-axis">y</span>0.50)</span>
-              <p>Area marked by the dashed line represents the nash equilibria for P2. The line is perpendicular
+              <p>Area marked by the dashed line represents the Nash equilibria for P2. The line is perpendicular
                 to the line the houses lie on at a distance from the house closer to the center at a distance equal to that house's 
                 distance to the other house.
               </p>
