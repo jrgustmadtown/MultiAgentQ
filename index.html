@@ -24,7 +24,7 @@
         <h2>Overview</h2>
         <p class="lede">
           This project explores how two agents act when making simultaneous choices in a game.
-          The agents learn through neural planning by using a neural network as a compact stand-in for a Q-value table in Q-Learning.
+          The agents learn through neural planning by using a neural network as an efficient stand-in for a Q-value table in Q-Learning.
           The planner repeatedly picks random states, asks the environment model what would happen for each joint action,
           and determines what each Q-value should be.
           Those values are the training labels and the network is adjusted so its predictions move closer to them.
@@ -330,14 +330,14 @@
           multiple equilibria exist, only one is selected at policy time.
         </p>
         <p>
-          The action spaces for the continous dog game is limited to a single step size and 16 angles.
+          The action spaces for the continuous dog game is limited to a single step size and 16 angles.
         </p>
         <h3>Future Work</h3>
         <p>
           Results using Policy Gradient methods such as 
           Advantage Actor-Critic and REINFORCE were not included in this page, 
           as I was not confident in the results. These can be implemented to remedy the 
-          limited action space of the continous dog games.
+          limited action space of the continuous dog games.
         </p>
         <p>
           Car Game can evaluated on larger grids. Dog Game's other versions can be further evaluated.
